@@ -85,6 +85,9 @@ export async function getUsageForProvider(connection, proxyOptions = null) {
     case "minimax":
     case "minimax-cn":
       return await getMiniMaxUsage(apiKey, provider, proxyOptions);
+    case "alicode":
+    case "alicode-intl":
+      return await getAlicodeUsage(apiKey, provider, proxyOptions);
     default:
       return { message: `Usage API not implemented for ${provider}` };
   }
@@ -1108,4 +1111,86 @@ async function getMiniMaxUsage(apiKey, provider, proxyOptions = null) {
   }
 
   return { message: lastErrorMessage ? `MiniMax connected. Unable to fetch usage: ${lastErrorMessage}` : "MiniMax connected. Unable to fetch usage." };
+}
+
+/**
+ * Alibaba Cloud Model Studio (DashScope) Coding Plan usage
+ *
+ * Coding Plan quota structure:
+ * - 6,000 requests per 5 hours (sliding window)
+ * - 45,000 requests per week (resets Monday 00:00 UTC+8)
+ * - 90,000 requests per month (resets on subscription date monthly UTC+8)
+ *
+ * Note: DashScope does not expose a public quota/usage API for Coding Plan.
+ * This implementation returns an informational message with plan details
+ * and probes the endpoint for any rate-limit headers.
+ */
+async function getAlicodeUsage(apiKey, provider, proxyOptions = null) {
+  const isIntl = provider === "alicode-intl";
+  const region = isIntl ? "International" : "China";
+  const consoleUrl = isIntl
+    ? "https://modelstudio.console.alibabacloud.com/ap-southeast-1/?tab=globalset#/efm/coding_plan"
+    : "https://bailian.console.aliyun.com/cn-beijing/?tab=model#/efm/coding_plan";
+
+  // Check if API key is a Coding Plan key (starts with sk-sp-)
+  const isCodingPlanKey = apiKey && apiKey.startsWith("sk-sp-");
+
+  if (!apiKey) {
+    return { message: "Alibaba API key not available." };
+  }
+
+  if (!isCodingPlanKey) {
+    return {
+      message: `This appears to be a standard DashScope API key (sk-xxx), not a Coding Plan key (sk-sp-xxx). Coding Plan quota tracking requires a subscription API key.`,
+    };
+  }
+
+  // Attempt to probe the coding endpoint for any usage info in response headers
+  const baseUrl = isIntl
+    ? "https://coding-intl.dashscope.aliyuncs.com"
+    : "https://coding.dashscope.aliyuncs.com";
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await proxyAwareFetch(`${baseUrl}/v1/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    }, proxyOptions);
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return { message: "Alibaba API key invalid or expired. Please check your Coding Plan subscription." };
+      }
+      console.warn(`[Alicode Usage] Models endpoint returned ${response.status}`);
+    }
+
+    // Check response headers for any rate limit / quota info
+    const rateLimitHeaders = {};
+    for (const [key, value] of response.headers.entries()) {
+      const lk = key.toLowerCase();
+      if (lk.includes("rate") || lk.includes("quota") || lk.includes("limit") || lk.includes("remaining")) {
+        rateLimitHeaders[key] = value;
+      }
+    }
+
+    if (Object.keys(rateLimitHeaders).length > 0) {
+      console.log(`[Alicode Usage] Rate limit headers:`, rateLimitHeaders);
+    }
+  } catch (error) {
+    console.warn(`[Alicode Usage] Probe failed: ${error.message}`);
+  }
+
+  return {
+    plan: "Coding Plan Pro",
+    message: `Alibaba ${region} Coding Plan connected. Quota: 6,000 req/5h, 45,000 req/week, 90,000 req/month. Check detailed usage at: ${consoleUrl}`,
+    quotas: [],
+  };
 }
