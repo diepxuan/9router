@@ -53,7 +53,8 @@ try { ensureSqliteRuntime({ silent: true }); } catch {}
 
 // Configuration constants
 const APP_NAME = pkg.name; // Use from package.json
-const GLOBAL_INSTALL_CMD = `npm i -g ${APP_NAME} --prefer-online`;
+const INSTALL_CMD_LATEST = `npm i -g ${APP_NAME}@latest --prefer-online`;
+
 const DEFAULT_PORT = 20128;
 const DEFAULT_HOST = "0.0.0.0";
 const MAX_PORT_ATTEMPTS = 10;
@@ -306,6 +307,10 @@ function killMitmByPidFile() {
       if (!waitForExit(pid, 1500)) {
         try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: "ignore", windowsHide: true, timeout: 3000 }); } catch { }
       }
+      // Last-resort: PowerShell Stop-Process (sometimes succeeds where taskkill fails on admin processes)
+      if (!waitForExit(pid, 500)) {
+        try { execSync(`powershell -NonInteractive -WindowStyle Hidden -Command "Stop-Process -Id ${pid} -Force"`, { stdio: "ignore", windowsHide: true, timeout: 3000 }); } catch { }
+      }
     } else {
       // SIGTERM via cached sudo token first
       try { execSync(`sudo -n kill -TERM ${pid} 2>/dev/null`, { stdio: "ignore", timeout: 2000 }); }
@@ -479,7 +484,7 @@ async function showInterfaceMenu(latestVersion) {
 
   clearScreen();
 
-  const displayHost = host === DEFAULT_HOST ? "127.0.0.1" : host;
+  const displayHost = host === DEFAULT_HOST ? "localhost" : host;
 
   // Detect tunnel/local mode for server URL display
   let serverUrl;
@@ -520,7 +525,7 @@ const MAX_RESTARTS = 2;
 const RESTART_RESET_MS = 30000; // Reset counter if alive > 30s
 
 function startServer(latestVersion) {
-  const displayHost = host === DEFAULT_HOST ? "127.0.0.1" : host;
+  const displayHost = host === DEFAULT_HOST ? "localhost" : host;
   const url = `http://${displayHost}:${port}/dashboard`;
 
   let restartCount = 0;
@@ -651,19 +656,16 @@ function startServer(latestVersion) {
 
         if (choice === "update") {
           isShuttingDown = true;
-          cleanup();
-          // Kill ALL lingering processes (server/next-server/cloudflared/tray) to release file locks on Windows
-          await killAllAppProcesses(port);
-          await killProcessOnPort(port);
-          await new Promise(r => setTimeout(r, 1500));
           const { clearScreen } = require("./src/cli/utils/display");
           clearScreen();
-          console.log(`\n⬆  New version: v${latestVersion}  ·  you are on v${pkg.version}\n`);
-          console.log("Run this command to update (9Router is stopped so file locks are released):\n");
-          console.log(`  ${GLOBAL_INSTALL_CMD}\n`);
-          console.log("After npm finishes, start 9Router again with:\n");
-          console.log(`  ${APP_NAME}\n`);
-          process.exit(0);
+          console.log(`\n⬆  Update v${pkg.version} → v${latestVersion}\n`);
+          console.log(`Run this after exit:\n`);
+          console.log(`   \x1b[33m${INSTALL_CMD_LATEST}\x1b[0m\n`);
+          cleanup();
+          await killAllAppProcesses(port);
+          await killProcessOnPort(port);
+          setTimeout(() => process.exit(0), 200);
+          return;
         } else if (choice === "web") {
           openBrowser(url);
           // Wait for user to come back

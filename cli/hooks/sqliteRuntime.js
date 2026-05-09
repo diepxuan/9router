@@ -76,36 +76,24 @@ function npmInstall(pkgs, opts = {}) {
   return res.status === 0;
 }
 
-// Public: ensure runtime SQLite deps. Called from cli.js startup AND postinstall.
+// Public: ensure better-sqlite3 native module is installed in user-writable
+// runtime dir. sql.js is bundled in bin/app already; node:sqlite is built-in.
+// This is purely a *speed optimization* — app works without it via fallbacks.
 function ensureSqliteRuntime({ silent = false } = {}) {
   ensureRuntimeDir();
 
-  const needSqlJs = !hasModule("sql.js");
   const needBetterSqlite = !hasModule("better-sqlite3") || !isBetterSqliteBinaryValid();
-
-  if (!needSqlJs && !needBetterSqlite) {
-    if (!silent) console.log("[9router][runtime] SQLite deps OK");
-    return { sqljs: true, betterSqlite: hasModule("better-sqlite3") && isBetterSqliteBinaryValid() };
+  if (!needBetterSqlite) {
+    if (!silent) console.log("[9router][runtime] better-sqlite3 OK");
+    return { betterSqlite: true };
   }
 
-  // sql.js — required
-  if (needSqlJs) {
-    const ok = npmInstall([`sql.js@${SQL_JS_VERSION}`], { silent });
-    if (!ok && !silent) console.warn("[9router][runtime] sql.js install failed");
+  const ok = npmInstall([`better-sqlite3@${BETTER_SQLITE3_VERSION}`], { optional: true, silent });
+  if (!ok && !silent) {
+    console.warn("[9router][runtime] better-sqlite3 install failed (will use node:sqlite or sql.js fallback)");
   }
-
-  // better-sqlite3 — optional (skip on failure)
-  let betterOk = !needBetterSqlite;
-  if (needBetterSqlite) {
-    betterOk = npmInstall([`better-sqlite3@${BETTER_SQLITE3_VERSION}`], { optional: true, silent });
-    if (!betterOk && !silent) {
-      console.warn("[9router][runtime] better-sqlite3 install failed (will use sql.js fallback)");
-    }
-  }
-
   return {
-    sqljs: hasModule("sql.js"),
-    betterSqlite: betterOk && hasModule("better-sqlite3") && isBetterSqliteBinaryValid(),
+    betterSqlite: ok && hasModule("better-sqlite3") && isBetterSqliteBinaryValid(),
   };
 }
 
