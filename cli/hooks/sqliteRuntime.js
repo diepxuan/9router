@@ -1,0 +1,127 @@
+// Shared logic: ensure sql.js + better-sqlite3 are installed in
+// USER_DATA_DIR/runtime/node_modules so they can be hot-replaced
+// without touching the (possibly Windows-locked) global install dir.
+const { execSync, spawnSync } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const SQL_JS_VERSION = "1.14.1";
+const BETTER_SQLITE3_VERSION = "12.6.2";
+
+function getDataDir() {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  return process.platform === "win32"
+    ? path.join(process.env.APPDATA || os.homedir(), "9router")
+    : path.join(os.homedir(), ".9router");
+}
+
+function getRuntimeDir() {
+  return path.join(getDataDir(), "runtime");
+}
+
+function getRuntimeNodeModules() {
+  return path.join(getRuntimeDir(), "node_modules");
+}
+
+function ensureRuntimeDir() {
+  const dir = getRuntimeDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  // Minimal package.json so npm treats it as a project root
+  const pkgPath = path.join(dir, "package.json");
+  if (!fs.existsSync(pkgPath)) {
+    fs.writeFileSync(pkgPath, JSON.stringify({
+      name: "9router-runtime",
+      version: "1.0.0",
+      private: true,
+      description: "User-writable runtime deps for 9router (sql.js + better-sqlite3)",
+    }, null, 2));
+  }
+  return dir;
+}
+
+function hasModule(name) {
+  return fs.existsSync(path.join(getRuntimeNodeModules(), name, "package.json"));
+}
+
+function isBetterSqliteBinaryValid() {
+  const binary = path.join(getRuntimeNodeModules(), "better-sqlite3", "build", "Release", "better_sqlite3.node");
+  if (!fs.existsSync(binary)) return false;
+  try {
+    const fd = fs.openSync(binary, "r");
+    const buf = Buffer.alloc(4);
+    fs.readSync(fd, buf, 0, 4, 0);
+    fs.closeSync(fd);
+    const magic = buf.toString("hex");
+    if (process.platform === "linux") return magic.startsWith("7f454c46");
+    if (process.platform === "darwin") return magic.startsWith("cffaedfe") || magic.startsWith("cefaedfe");
+    if (process.platform === "win32") return magic.startsWith("4d5a");
+    return true;
+  } catch { return false; }
+}
+
+function npmInstall(pkgs, opts = {}) {
+  const cwd = ensureRuntimeDir();
+  const args = ["install", ...pkgs, "--no-audit", "--no-fund", "--prefer-online"];
+  if (opts.optional) args.push("--no-save");
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+  console.log(`[9router][runtime] ${npmCmd} ${args.join(" ")}  (cwd: ${cwd})`);
+  const res = spawnSync(npmCmd, args, {
+    cwd,
+    stdio: opts.silent ? "ignore" : "inherit",
+    timeout: opts.timeout || 180000,
+    shell: process.platform === "win32",
+  });
+  return res.status === 0;
+}
+
+// Public: ensure runtime SQLite deps. Called from cli.js startup AND postinstall.
+function ensureSqliteRuntime({ silent = false } = {}) {
+  ensureRuntimeDir();
+
+  const needSqlJs = !hasModule("sql.js");
+  const needBetterSqlite = !hasModule("better-sqlite3") || !isBetterSqliteBinaryValid();
+
+  if (!needSqlJs && !needBetterSqlite) {
+    if (!silent) console.log("[9router][runtime] SQLite deps OK");
+    return { sqljs: true, betterSqlite: hasModule("better-sqlite3") && isBetterSqliteBinaryValid() };
+  }
+
+  // sql.js — required
+  if (needSqlJs) {
+    const ok = npmInstall([`sql.js@${SQL_JS_VERSION}`], { silent });
+    if (!ok && !silent) console.warn("[9router][runtime] sql.js install failed");
+  }
+
+  // better-sqlite3 — optional (skip on failure)
+  let betterOk = !needBetterSqlite;
+  if (needBetterSqlite) {
+    betterOk = npmInstall([`better-sqlite3@${BETTER_SQLITE3_VERSION}`], { optional: true, silent });
+    if (!betterOk && !silent) {
+      console.warn("[9router][runtime] better-sqlite3 install failed (will use sql.js fallback)");
+    }
+  }
+
+  return {
+    sqljs: hasModule("sql.js"),
+    betterSqlite: betterOk && hasModule("better-sqlite3") && isBetterSqliteBinaryValid(),
+  };
+}
+
+// Inject runtime node_modules into NODE_PATH so child Node processes resolve them.
+function buildEnvWithRuntime(baseEnv = process.env) {
+  const runtimeNm = getRuntimeNodeModules();
+  const existing = baseEnv.NODE_PATH || "";
+  const NODE_PATH = existing
+    ? `${runtimeNm}${path.delimiter}${existing}`
+    : runtimeNm;
+  return { ...baseEnv, NODE_PATH };
+}
+
+module.exports = {
+  ensureSqliteRuntime,
+  buildEnvWithRuntime,
+  getRuntimeDir,
+  getRuntimeNodeModules,
+};

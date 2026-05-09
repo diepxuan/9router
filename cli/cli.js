@@ -43,7 +43,13 @@ function createSpinner(text) {
 }
 
 const pkg = require("./package.json");
+const { ensureSqliteRuntime, buildEnvWithRuntime } = require("./hooks/sqliteRuntime");
 const args = process.argv.slice(2);
+
+// Self-heal SQLite runtime deps (sql.js + better-sqlite3) into ~/.9router/runtime
+// so the server can resolve them via NODE_PATH. Best-effort — sql.js is required,
+// better-sqlite3 is optional. Logs to stderr only on failure.
+try { ensureSqliteRuntime({ silent: true }); } catch {}
 
 // Configuration constants
 const APP_NAME = pkg.name; // Use from package.json
@@ -473,7 +479,7 @@ async function showInterfaceMenu(latestVersion) {
 
   clearScreen();
 
-  const displayHost = host === DEFAULT_HOST ? "localhost" : host;
+  const displayHost = host === DEFAULT_HOST ? "127.0.0.1" : host;
 
   // Detect tunnel/local mode for server URL display
   let serverUrl;
@@ -514,7 +520,7 @@ const MAX_RESTARTS = 2;
 const RESTART_RESET_MS = 30000; // Reset counter if alive > 30s
 
 function startServer(latestVersion) {
-  const displayHost = host === DEFAULT_HOST ? "localhost" : host;
+  const displayHost = host === DEFAULT_HOST ? "127.0.0.1" : host;
   const url = `http://${displayHost}:${port}/dashboard`;
 
   let restartCount = 0;
@@ -532,7 +538,7 @@ function startServer(latestVersion) {
       detached: true,
       windowsHide: true,
       env: {
-        ...process.env,
+        ...buildEnvWithRuntime(process.env),
         PORT: port.toString(),
         HOSTNAME: host
       }
