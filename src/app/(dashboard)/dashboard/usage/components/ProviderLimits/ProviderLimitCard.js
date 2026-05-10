@@ -46,6 +46,8 @@ export default function ProviderLimitCard({
       kiro: "#FF9900",
       qoder: "#EC4899",
       claude: "#D97757",
+      alicode: "#FF6A00",
+      "alicode-intl": "#FF6A00",
     };
     return colors[provider?.toLowerCase()] || "#6B7280";
   };

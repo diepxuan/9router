@@ -91,6 +91,9 @@ export async function getUsageForProvider(connection, proxyOptions = null) {
     case "minimax":
     case "minimax-cn":
       return await getMiniMaxUsage(apiKey, provider, proxyOptions);
+    case "alicode":
+    case "alicode-intl":
+      return await getAlicodeUsage(apiKey, provider, proxyOptions);
     default:
       return { message: `Usage API not implemented for ${provider}` };
   }
@@ -1152,64 +1155,178 @@ async function getMiniMaxUsage(apiKey, provider, proxyOptions = null) {
   return { message: lastErrorMessage ? `MiniMax connected. Unable to fetch usage: ${lastErrorMessage}` : "MiniMax connected. Unable to fetch usage." };
 }
 
-async function getQoderUsage(accessToken, proxyOptions = null) {
-  if (!accessToken) {
-    return { message: "Qoder usage unavailable: no access token" };
+/**
+ * Alibaba Cloud Model Studio (DashScope) Coding Plan usage
+ *
+ * Coding Plan quota structures:
+ *
+ * Lite Basic Plan (¥40/month, stopped new sales 2026-03-20):
+ *   - 1,200 requests per 5 hours (sliding window, rolling reset)
+ *   - 9,000 requests per week (resets Monday 00:00 UTC+8)
+ *   - 18,000 requests per month (resets on subscription date monthly UTC+8)
+ *   - Models: same as Pro (qwen3.5-plus, kimi-k2.5, glm-5, MiniMax-M2.5, etc.)
+ *
+ * Pro Plan (¥200/month / $50/month):
+ *   - 6,000 requests per 5 hours (sliding window, rolling reset)
+ *   - 45,000 requests per week (resets Monday 00:00 UTC+8)
+ *   - 90,000 requests per month (resets on subscription date monthly UTC+8)
+ *
+ * Note: DashScope does not expose a public quota/usage API for Coding Plan.
+ * Both plans use the same API key format (sk-sp-xxxxx), so plan type cannot be
+ * auto-detected from the key alone. This implementation probes the endpoint
+ * for rate-limit headers that may indicate the active plan, and falls back
+ * to displaying both plan details for manual identification.
+ */
+async function getAlicodeUsage(apiKey, provider, proxyOptions = null) {
+  const isIntl = provider === "alicode-intl";
+  const region = isIntl ? "International" : "China";
+  const consoleUrl = isIntl
+    ? "https://modelstudio.console.alibabacloud.com/ap-southeast-1/?tab=globalset#/efm/coding_plan"
+    : "https://bailian.console.aliyun.com/cn-beijing/?tab=model#/efm/coding_plan";
+
+  // Check if API key is a Coding Plan key (starts with sk-sp-)
+  const isCodingPlanKey = apiKey && apiKey.startsWith("sk-sp-");
+
+  if (!apiKey) {
+    return { message: "Alibaba API key not available." };
   }
+
+  if (!isCodingPlanKey) {
+    return {
+      message: `This appears to be a standard DashScope API key (sk-xxx), not a Coding Plan key (sk-sp-xxx). Coding Plan quota tracking requires a subscription API key.`,
+    };
+  }
+
+  // Attempt to probe the coding endpoint for any usage info in response headers
+  const baseUrl = isIntl
+    ? "https://coding-intl.dashscope.aliyuncs.com"
+    : "https://coding.dashscope.aliyuncs.com";
+
+  let detectedPlan = null;
+  let rawHeaders = {};
+
   try {
-    const response = await proxyAwareFetch(
-      "https://openapi.qoder.sh/api/v2/quota/usage",
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await proxyAwareFetch(`${baseUrl}/v1/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    }, proxyOptions);
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return { message: "Alibaba API key invalid or expired. Please check your Coding Plan subscription." };
+      }
+      console.warn(`[Alicode Usage] Models endpoint returned ${response.status}`);
+    }
+
+    // Collect all relevant rate-limit / quota headers
+    for (const [key, value] of response.headers.entries()) {
+      const lk = key.toLowerCase();
+      if (lk.includes("rate") || lk.includes("quota") || lk.includes("limit") || lk.includes("remaining") || lk.includes("plan") || lk.includes("tier")) {
+        rawHeaders[key] = value;
+      }
+    }
+
+    if (Object.keys(rawHeaders).length > 0) {
+      console.log(`[Alicode Usage] Rate limit headers:`, rawHeaders);
+
+      // Try to detect plan from rate-limit header values
+      // Pro plan: 6000/5h, 45000/week, 90000/month
+      // Lite plan: 1200/5h, 9000/week, 18000/month
+      for (const [, value] of Object.entries(rawHeaders)) {
+        const numMatch = value.match(/(\d+)/);
+        if (numMatch) {
+          const num = parseInt(numMatch[1], 10);
+          // If we see a 5-hour limit of 6000, it's Pro
+          if (num === 6000) {
+            detectedPlan = "pro";
+          }
+          // If we see a 5-hour limit of 1200, it's Lite
+          else if (num === 1200) {
+            detectedPlan = "lite";
+          }
+          // If we see 45000 or 90000, it's Pro
+          else if (num >= 45000) {
+            detectedPlan = "pro";
+          }
+          // If we see 9000 or 18000, it's Lite
+          else if (num === 9000 || num === 18000) {
+            detectedPlan = "lite";
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`[Alicode Usage] Probe failed: ${error.message}`);
+  }
+
+  // Build plan-specific response
+  if (detectedPlan === "lite") {
+    return {
+      plan: "Coding Plan Lite",
+      quotas: {
+        "5-hour (sliding)": {
+          used: 0,
+          total: 1200,
+          resetAt: null,
+          note: "Rolling window - resets 5h after each request",
+        },
+        "weekly (7d)": {
+          used: 0,
+          total: 9000,
+          resetAt: null,
+          note: "Resets Monday 00:00 UTC+8",
+        },
+        "monthly (30d)": {
+          used: 0,
+          total: 18000,
+          resetAt: null,
+          note: "Resets on subscription date monthly (UTC+8)",
         },
       },
-      proxyOptions,
-    );
-    if (!response.ok) {
-      return { message: `Qoder connected. Usage fetch returned ${response.status}.` };
-    }
-    const body = await response.json().catch(() => null);
-    if (!body) {
-      return { message: "Qoder connected. Usage response was not JSON." };
-    }
-    // Quota records live under `quotas`; scalar metadata
-    // (totalUsagePercentage, isQuotaExceeded, expiresAt) are surfaced as
-    // siblings so the dashboard parser doesn't try to render them as rows.
-    const userQuota = body.userQuota || {};
-    const orgQuota = body.orgResourcePackage || {};
-    // Qoder publishes a single absolute reset timestamp (`expiresAt` in ms);
-    // surface it on every quota record as ISO so the table can render
-    // "resets at" alongside used/total.
-    const expiresAtMs = Number.isFinite(Number(body.expiresAt)) && Number(body.expiresAt) > 0
-      ? Number(body.expiresAt)
-      : null;
-    const resetAt = expiresAtMs ? new Date(expiresAtMs).toISOString() : null;
-    const quotas = {
-      user: {
-        total: Number(userQuota.total) || 0,
-        used: Number(userQuota.used) || 0,
-        remaining: Number(userQuota.remaining) || 0,
-        unit: userQuota.unit || "credits",
-        resetAt,
-      },
-      organization: {
-        total: Number(orgQuota.total) || 0,
-        used: Number(orgQuota.used) || 0,
-        remaining: Number(orgQuota.remaining) || 0,
-        unit: orgQuota.unit || "credits",
-        resetAt,
-      },
+      message: `Alibaba ${region} Coding Plan Lite detected. Check detailed usage at: ${consoleUrl}`,
     };
-    return {
-      quotas,
-      totalUsagePercentage: Number(body.totalUsagePercentage) || 0,
-      isQuotaExceeded: !!body.isQuotaExceeded,
-      expiresAt: expiresAtMs,
-    };
-  } catch (error) {
-    return { message: `Qoder connected. Unable to fetch usage: ${error.message}` };
   }
+
+  if (detectedPlan === "pro") {
+    return {
+      plan: "Coding Plan Pro",
+      quotas: {
+        "5-hour (sliding)": {
+          used: 0,
+          total: 6000,
+          resetAt: null,
+          note: "Rolling window - resets 5h after each request",
+        },
+        "weekly (7d)": {
+          used: 0,
+          total: 45000,
+          resetAt: null,
+          note: "Resets Monday 00:00 UTC+8",
+        },
+        "monthly (30d)": {
+          used: 0,
+          total: 90000,
+          resetAt: null,
+          note: "Resets on subscription date monthly (UTC+8)",
+        },
+      },
+      message: `Alibaba ${region} Coding Plan Pro detected. Check detailed usage at: ${consoleUrl}`,
+    };
+  }
+
+  // Plan not detected - show both plan details for manual identification
+  return {
+    plan: "Coding Plan",
+    message: `Alibaba ${region} Coding Plan connected. Plan auto-detection unavailable (no quota API). Lite: 1,200 req/5h, 9,000 req/week, 18,000 req/month. Pro: 6,000 req/5h, 45,000 req/week, 90,000 req/month. Check plan & usage at: ${consoleUrl}`,
+    quotas: [],
+  };
 }
