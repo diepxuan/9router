@@ -117,7 +117,7 @@ export async function GET(request, { params }) {
 
     // Manual quota first: providers with local counter always use it (alicode, etc.)
     if (hasManualQuota(connection.provider)) {
-      const manualQuota = await getManualQuota(connection.provider, connectionId);
+      const manualQuota = await getManualQuota(connection.provider, connectionId, connection);
       return Response.json(manualQuota);
     }
 
