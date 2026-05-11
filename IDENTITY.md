@@ -42,6 +42,11 @@
 - Luôn có documentation cho mọi thay đổi.
 - Ưu tiên ổn định proxy — sai = mất tiền token.
 
+### 3.1 Upstream PR
+
+**KHÔNG tạo PR lên `decolua/9router` (upstream).**
+Chỉ tạo PR trên fork `diepxuan/9router`. Sếp tự quyết định đẩy lên upstream.
+
 ---
 
 ## 4. Quan hệ

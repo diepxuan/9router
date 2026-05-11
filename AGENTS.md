@@ -66,6 +66,25 @@ Mỗi session làm việc với 9router phải:
 - Không push trực tiếp main.
 - Chờ Sếp review.
 
+### 4.1 PR Policy — CẤM TẠO UPSTREAM PR
+
+**Chỉ tạo PR trên fork `diepxuan/9router`.**
+**KHÔNG BAO GIỜ tạo PR trực tiếp lên upstream `decolua/9router`.**
+
+Quy trình đúng:
+1. Code trên branch mới (từ `main` của fork)
+2. Commit + push lên fork `diepxuan/9router`
+3. Tạo PR trên fork: `diepxuan/9router#N` (base=`main`)
+4. Báo Sếp — Sếp tự merge vào fork
+5. Sếp tự quyết định có push lên upstream `decolua/9router/master` hay không
+
+Lý do:
+- Upstream repo `decolua/9router` là nguồn public, cần kiểm soát chặt.
+- Sếp là người duy nhất quyết định khi nào code được đẩy lên upstream.
+- Tránh tạo PR rác hoặc PR chưa được review lên upstream.
+
+Nếu agent lỡ tạo upstream PR → xóa ngay, báo Sếp.
+
 ---
 
 ## 5. Testing
