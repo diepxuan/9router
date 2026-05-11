@@ -9,6 +9,7 @@
 
 ## Fixes
 - Fix Next.js 16 WebSocket HMR blocked cross-origin — add `allowedDevOrigins` config
+- AliCode usage UI: hide reset countdown for 5h & weekly windows (real-time counting, no fixed reset) — only monthly shows reset info
 
 # v0.4.28 (2026-05-10)
 

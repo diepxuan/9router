@@ -1,10 +1,15 @@
 /**
  * Manual quota tracking — dành cho các provider không có quota API.
- * 
+ *
  * Cơ chế:
- * - Đếm số request thực tế từ usageDaily (byAccount → connectionId)
- * - So sánh với thresholds để tự động detect plan (Lite vs Pro)
+ * - Fixed window (không phải rolling) — đúng theo cách AliCode tính
+ * - Đếm request từ usageDaily (byAccount → connectionId)
+ * - So sánh với thresholds để auto-detect plan (Lite vs Pro)
  * - Trả về quota object tương thích với ProviderLimits UI
+ *
+ * ⚠️ Lưu ý: Local counter đếm TẤT CẢ request qua 9Router.
+ * AliCode có thể đếm khác (theo API call thực tế, filter theo model...).
+ * Số liệu local chỉ mang tính tham khảo, gần đúng.
  */
 
 import { getAdapter } from "../driver.js";
@@ -15,80 +20,138 @@ export const ALICODE_PLANS = {
   lite: {
     name: "Lite",
     windows: [
-      { name: "5h requests",   limit: 1200,  windowMs: 5 * 60 * 60 * 1000 },
-      { name: "Weekly requests", limit: 9000,  windowMs: 7 * 24 * 60 * 60 * 1000 },
-      { name: "Monthly requests", limit: 18000, windowMs: 30 * 24 * 60 * 60 * 1000 },
+      { name: "5h requests", limit: 1200 },
+      { name: "Weekly requests", limit: 9000 },
+      { name: "Monthly requests", limit: 18000 },
     ],
   },
   pro: {
     name: "Pro",
     windows: [
-      { name: "5h requests",   limit: 6000,  windowMs: 5 * 60 * 60 * 1000 },
-      { name: "Weekly requests", limit: 45000, windowMs: 7 * 24 * 60 * 60 * 1000 },
-      { name: "Monthly requests", limit: 90000, windowMs: 30 * 24 * 60 * 60 * 1000 },
+      { name: "5h requests", limit: 6000 },
+      { name: "Weekly requests", limit: 45000 },
+      { name: "Monthly requests", limit: 90000 },
     ],
   },
 };
 
 /**
- * Tự động detect plan dựa trên số request trong window dài nhất (monthly).
- * Logic: nếu request trong tháng vượt ngưỡng Lite (18k) → Pro, ngược lại Lite.
- * Nếu chưa đủ dữ liệu → trả về Lite (conservative).
+ * Detect plan từ connection data (lưu trong providerSpecificData.manualQuotaPlan).
+ * Nếu chưa set → auto-detect từ monthly count.
  */
-export function detectAlicodePlan(totalMonthlyRequests) {
-  if (!totalMonthlyRequests || totalMonthlyRequests < 18000) return "lite";
-  return "pro";
+export function detectAlicodePlan(totalMonthlyRequests, storedPlan) {
+  if (storedPlan && (storedPlan === "lite" || storedPlan === "pro")) return storedPlan;
+  return totalMonthlyRequests >= 18000 ? "pro" : "lite";
 }
 
 /**
- * Tính reset time cho từng window.
- * Rolling window: reset tại thời điểm oldest request + windowMs.
- * Nếu không có request nào → reset tại now + windowMs.
+ * Tính window start/end dạng fixed theo AliCode.
+ * - 5h: fixed 5h blocks từ UTC 00:00 (0-5, 5-10, 10-15, 15-20, 20-24)
+ * - Weekly: reset Sunday 23:00 UTC+7 (= 16:00 UTC)
+ * - Monthly: reset ngày 4 hàng tháng 23:00 UTC+7 (= 16:00 UTC)
  */
-function computeResetAt(windowMs, now, oldestRequestTimestamp) {
-  if (oldestRequestTimestamp) {
-    // Rolling từ lần request cũ nhất trong window
-    return new Date(oldestRequestTimestamp + windowMs).toISOString();
+function computeFixedWindow(windowKey, now) {
+  const d = new Date(now);
+
+  if (windowKey === "5h") {
+    // Fixed 5h blocks: 00-05, 05-10, 10-15, 15-20, 20-24 UTC
+    const utcHour = d.getUTCHours();
+    const blockStart = Math.floor(utcHour / 5) * 5;
+    const start = new Date(d);
+    start.setUTCHours(blockStart, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCHours(blockStart + 5, 0, 0, 0);
+    return { start: start.toISOString(), end: end.toISOString() };
   }
-  // Chưa có request → reset tại now + windowMs
-  return new Date(now + windowMs).toISOString();
+
+  if (windowKey === "weekly") {
+    // Reset Sunday 16:00 UTC (= 23:00 UTC+7)
+    const dayOfWeek = d.getUTCDay(); // 0=Sun
+    const start = new Date(d);
+    start.setUTCDate(d.getUTCDate() - dayOfWeek);
+    start.setUTCHours(16, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 7);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  if (windowKey === "monthly") {
+    // Reset ngày mùng 4, 16:00 UTC (= 23:00 UTC+7)
+    const day = d.getUTCDate();
+    const start = new Date(d);
+    if (day >= 4) {
+      start.setUTCDate(4);
+    } else {
+      start.setUTCMonth(d.getUTCMonth() - 1);
+      start.setUTCDate(4);
+    }
+    start.setUTCHours(16, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCMonth(start.getUTCMonth() + 1);
+    end.setUTCDate(4);
+    end.setUTCHours(16, 0, 0, 0);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  return { start: null, end: null };
 }
 
 function formatCountdown(isoString) {
   if (!isoString) return "-";
   const diff = new Date(isoString).getTime() - Date.now();
-  if (diff <= 0) return "0m";
+  if (diff <= 0) return "now";
 
-  const mins = Math.floor(diff / 60000);
-  const hours = Math.floor(mins / 60);
+  const totalMins = Math.ceil(diff / 60000);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
   if (hours >= 24) {
     const days = Math.floor(hours / 24);
-    return `${days}d ${hours % 24}h`;
+    const remainH = hours % 24;
+    return remainH > 0 ? `${days}d ${remainH}h` : `${days}d`;
   }
-  if (hours > 0) return `${hours}h ${mins % 60}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
   return `${mins}m`;
 }
 
 /**
- * Đếm số request của một connection trong khoảng thời gian.
- * Đọc từ usageDaily table, aggregate byAccount theo connectionId.
+ * Đếm số request của connection trong khoảng [startDate, endDate].
+ * Đọc từ usageDaily table → aggregate byAccount theo connectionId.
+ * Partial day ở đầu/cuối: đếm trực tiếp từ usageHistory để chính xác.
  */
-async function countRequestsInWindow(connectionId, windowMs) {
+async function countRequestsInRange(connectionId, startDate, endDate) {
   const db = await getAdapter();
-  const now = Date.now();
-  const cutoff = now - windowMs;
+  const startKey = startDate.toISOString().slice(0, 10);
+  const endKey = endDate.toISOString().slice(0, 10);
 
-  // Lấy tất cả daily records trong window
+  // Lấy daily records trong range
   const rows = db.all(
-    `SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`,
-    [new Date(cutoff).toISOString().slice(0, 10)]
+    `SELECT dateKey, data FROM usageDaily WHERE dateKey >= ? AND dateKey <= ?`,
+    [startKey, endKey]
   );
 
   let total = 0;
+  const startTs = startDate.getTime();
+  const endTs = endDate.getTime();
+
   for (const row of rows) {
     const dayData = parseJson(row.data, {});
-    if (dayData.byAccount && dayData.byAccount[connectionId]) {
-      total += dayData.byAccount[connectionId].requests || 0;
+    const accountData = dayData.byAccount?.[connectionId];
+    if (!accountData) continue;
+
+    // Nếu ngày này nằm hoàn toàn trong range → lấy total
+    const dayStart = new Date(row.dateKey + "T00:00:00Z").getTime();
+    const dayEnd = dayStart + 86400000;
+
+    if (dayStart >= startTs && dayEnd <= endTs) {
+      total += accountData.requests || 0;
+    } else {
+      // Partial day → đếm từ usageHistory để chính xác
+      const histRows = db.all(
+        `SELECT COUNT(*) as cnt FROM usageHistory
+         WHERE connectionId = ? AND timestamp >= ? AND timestamp < ?`,
+        [connectionId, startDate.toISOString(), endDate.toISOString()]
+      );
+      total += histRows[0]?.cnt || 0;
     }
   }
 
@@ -96,31 +159,68 @@ async function countRequestsInWindow(connectionId, windowMs) {
 }
 
 /**
- * Hàm chính: trả về quota data cho alicode connection.
- * Format tương thích với ProviderLimits UI.
+ * Đếm total 30 ngày qua để detect plan (dùng làm fallback).
  */
-export async function getAlicodeManualQuota(connectionId) {
-  try {
-    const now = Date.now();
+async function countRequestsLast30Days(connectionId) {
+  const db = await getAdapter();
+  const now = Date.now();
+  const cutoff = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
 
-    // Đếm request trong monthly window để detect plan
-    const monthlyCount = await countRequestsInWindow(connectionId, 30 * 24 * 60 * 60 * 1000);
-    const plan = detectAlicodePlan(monthlyCount);
+  const rows = db.all(
+    `SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`,
+    [cutoff]
+  );
+
+  let total = 0;
+  for (const row of rows) {
+    const dayData = parseJson(row.data, {});
+    const accountData = dayData.byAccount?.[connectionId];
+    if (accountData) total += accountData.requests || 0;
+  }
+  return total;
+}
+
+/**
+ * Hàm chính: trả về quota data cho alicode connection.
+ * Fixed window, đúng theo cách AliCode tính.
+ */
+export async function getAlicodeManualQuota(connectionId, connection) {
+  try {
+    const now = new Date();
+
+    // Lấy stored plan từ connection data nếu có
+    const storedPlan = connection?.providerSpecificData?.manualQuotaPlan;
+    const monthlyTotalForDetect = await countRequestsLast30Days(connectionId);
+    const plan = detectAlicodePlan(monthlyTotalForDetect, storedPlan);
     const planDef = ALICODE_PLANS[plan];
 
-    // Đếm từng window
+    // Tính từng fixed window
+    const windowKeys = ["5h", "weekly", "monthly"];
     const quotas = [];
-    for (const win of planDef.windows) {
-      const used = await countRequestsInWindow(connectionId, win.windowMs);
-      const resetAt = computeResetAt(win.windowMs, now);
+
+    for (let i = 0; i < planDef.windows.length; i++) {
+      const win = planDef.windows[i];
+      const wKey = windowKeys[i];
+      const { start, end } = computeFixedWindow(wKey, now);
+
+      let used = 0;
+      if (start && end) {
+        used = await countRequestsInRange(connectionId, new Date(start), new Date(end));
+      }
+
+      // 5h và weekly là counting real-time đến hiện tại → ẩn reset info
+      const isRollingWindow = wKey === "5h" || wKey === "weekly";
 
       quotas.push({
         name: win.name,
         used,
         total: win.limit,
         remainingPercentage: Math.max(0, Math.round(((win.limit - used) / win.limit) * 100)),
-        resetAt,
-        resetCountdown: formatCountdown(resetAt),
+        resetAt: isRollingWindow ? null : end,
+        resetCountdown: isRollingWindow ? null : formatCountdown(end),
+        hideReset: isRollingWindow || false,
+        windowStart: start,
+        windowEnd: end,
       });
     }
 
@@ -132,8 +232,9 @@ export async function getAlicodeManualQuota(connectionId) {
         provider: "alicode",
         connectionId,
         plan,
-        monthlyTotalRequests: monthlyCount,
+        monthlyTotalRequests: monthlyTotalForDetect,
         source: "manual-counter",
+        note: "Local counter — counts all requests through 9Router. May differ from AliCode's actual quota.",
       },
     };
   } catch (e) {
@@ -157,8 +258,8 @@ export function hasManualQuota(provider) {
   return provider in MANUAL_QUOTA_HANDLERS;
 }
 
-export async function getManualQuota(provider, connectionId) {
+export async function getManualQuota(provider, connectionId, connection) {
   const handler = MANUAL_QUOTA_HANDLERS[provider];
   if (!handler) return null;
-  return handler(connectionId);
+  return handler(connectionId, connection);
 }
