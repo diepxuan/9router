@@ -75,5 +75,6 @@ deploy*.sh
 ecosystem.config.*
 
 scripts/agSniffer/*
+scripts/sync.sh
 gitbooks/*
 gitbook/README.md
