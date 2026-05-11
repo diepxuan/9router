@@ -1,3 +1,15 @@
+# v0.4.29 (2026-05-11)
+
+## Features
+- Add manual quota counter for providers without quota API (AliCode)
+  - Auto-detect AliCode plan (Lite/Pro) based on monthly request count
+  - Track 3 rolling windows: 5h, weekly, monthly
+  - Local badge + plan badge on ProviderLimits UI
+  - Registry pattern for easy extension to new providers
+
+## Fixes
+- Fix Next.js 16 WebSocket HMR blocked cross-origin — add `allowedDevOrigins` config
+
 # v0.4.28 (2026-05-10)
 
 ## Features
