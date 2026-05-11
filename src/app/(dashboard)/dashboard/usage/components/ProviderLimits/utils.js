@@ -194,6 +194,9 @@ export function parseQuotaData(provider, data) {
               remainingPercentage: quota.remainingPercentage,
               resetAt: quota.resetAt || null,
               resetCountdown: quota.resetCountdown,
+              hideReset: quota.hideReset || false,
+              windowStart: quota.windowStart,
+              windowEnd: quota.windowEnd,
             });
           });
         }
