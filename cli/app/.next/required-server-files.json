@@ -105,10 +105,6 @@
       }
     },
     "outputFileTracingRoot": "/home/runner/work/9router/9router",
-    "allowedDevOrigins": [
-      "10.0.0.122",
-      "localhost"
-    ],
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -315,6 +311,11 @@
     ],
     "turbopack": {
       "root": "/home/runner/work/9router/9router"
+    },
+    "outputFileTracingExcludes": {
+      "*": [
+        "./gitbook/**/*"
+      ]
     },
     "distDirRoot": ".next",
     "_originalRewrites": {
