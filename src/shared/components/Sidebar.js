@@ -56,7 +56,7 @@ export default function Sidebar({ onClose }) {
     fetch("/api/settings")
       .then(res => res.json())
       .then(data => { if (data.enableTranslator) setEnableTranslator(true); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Lazy check for new npm version on mount
@@ -64,7 +64,7 @@ export default function Sidebar({ onClose }) {
     fetch("/api/version")
       .then(res => res.json())
       .then(data => { if (data.hasUpdate) setUpdateInfo(data); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const isActive = (href) => {
@@ -91,7 +91,7 @@ export default function Sidebar({ onClose }) {
       setShutdownCountdown(remaining);
       if (remaining <= 0) {
         clearInterval(timer);
-        fetch("/api/version/shutdown", { method: "POST" }).catch(() => {});
+        fetch("/api/version/shutdown", { method: "POST" }).catch(() => { });
         setIsDisconnected(true);
       }
     }, 1000);

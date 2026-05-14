@@ -69,11 +69,12 @@ export default function QuotaProgressBar({
   used = 0,
   total = 0,
   unlimited = false,
-  resetTime = null
+  resetTime = null,
+  hideReset = false
 }) {
   const colors = getColorClasses(percentage);
-  const countdown = formatResetTime(resetTime);
-  const resetDisplay = formatResetTimeDisplay(resetTime);
+  const countdown = hideReset ? null : formatResetTime(resetTime);
+  const resetDisplay = hideReset ? null : formatResetTimeDisplay(resetTime);
   
   // percentage is already remaining percentage (from ProviderLimitCard)
   const remaining = percentage;

@@ -206,7 +206,7 @@ export function getTailscaleFunnelUrl(port) {
  * - Windows: download MSI via UAC-elevated PowerShell
  */
 export async function installTailscale(sudoPassword, hostname, onProgress) {
-  const log = onProgress || (() => {});
+  const log = onProgress || (() => { });
   if (IS_WINDOWS) {
     await installTailscaleWindows(log);
     return { success: true };
@@ -463,7 +463,7 @@ export async function startDaemonWithPassword(sudoPassword) {
         const out = execSync(`"${bin}" status --json`, { encoding: "utf8", windowsHide: true, timeout: 2000 });
         const j = JSON.parse(out);
         if (j.BackendState && j.BackendState !== "NoState") {
-          console.log(`[Tailscale] win: BackendState=${j.BackendState} after ${i*500}ms`);
+          console.log(`[Tailscale] win: BackendState=${j.BackendState} after ${i * 500}ms`);
           return;
         }
       } catch { /* daemon not ready */ }
@@ -534,7 +534,7 @@ export async function startDaemonWithPassword(sudoPassword) {
 
 /** Best-effort: ensure daemon running (used for login flow) */
 function ensureDaemon() {
-  startDaemonWithPassword("").catch(() => {});
+  startDaemonWithPassword("").catch(() => { });
 }
 
 /** Read AuthURL from `tailscale status --json` (Win exposes it there, not stdout). */

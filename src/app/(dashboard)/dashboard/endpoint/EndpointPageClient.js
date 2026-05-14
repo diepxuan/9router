@@ -753,9 +753,8 @@ export default function APIPageClient({ machineId }) {
           />
           {/* Cloudflare Tunnel */}
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${
-              tunnelEnabled ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
-            }`}>Tunnel</span>
+            <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${tunnelEnabled ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
+              }`}>Tunnel</span>
             {tunnelEnabled && !tunnelLoading && tunnelReachable ? (
               <>
                 <Input value={`${tunnelPublicUrl || tunnelUrl}/v1`} readOnly className="flex-1 font-mono text-sm" />
@@ -841,9 +840,8 @@ export default function APIPageClient({ machineId }) {
           </div>
           {/* Tailscale */}
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${
-              tsEnabled ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
-            }`}>Tailscale</span>
+            <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${tsEnabled ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
+              }`}>Tailscale</span>
             {tsEnabled && !tsLoading && tsReachable ? (
               <>
                 <Input value={`${tsUrl}/v1`} readOnly className="flex-1 font-mono text-sm" />
@@ -1013,11 +1011,10 @@ export default function APIPageClient({ machineId }) {
                   <button
                     key={lvl.id}
                     onClick={() => handleCavemanLevel(lvl.id)}
-                    className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                      cavemanLevel === lvl.id
+                    className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${cavemanLevel === lvl.id
                         ? "bg-primary text-white border-primary"
                         : "bg-transparent border-border text-text-muted hover:bg-surface-2"
-                    }`}
+                      }`}
                     title={lvl.desc}
                   >
                     {lvl.label}
@@ -1372,8 +1369,7 @@ export default function APIPageClient({ machineId }) {
 function EndpointRow({ label, url, copyId, copied, onCopy, badge, actions }) {
   return (
     <div className="flex items-center gap-2">
-      <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${
-          (badge === "CF" || badge === "TS") ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
+      <span className={`text-xs font-mono px-1.5 py-0.5 rounded shrink-0 min-w-[88px] text-center ${(badge === "CF" || badge === "TS") ? "bg-primary/10 text-primary" : "bg-surface-2 text-text-muted"
         }`}>{label}</span>
       <Input value={url} readOnly className="flex-1 font-mono text-sm" />
       <button
@@ -1401,7 +1397,7 @@ function StatusAlert({ status, className = "" }) {
 
   return (
     <div className={`p-2 rounded text-sm ${className} ${status.type === "success" ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-        status.type === "warning" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+      status.type === "warning" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
         status.type === "info" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" :
           "bg-red-500/10 text-red-600 dark:text-red-400"
       }`}>
