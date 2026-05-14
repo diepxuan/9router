@@ -3,9 +3,10 @@ const fs = require("fs");
 const path = require("path");
 
 let trayInstance = null;
+let isWinTray = false;
 
 /**
- * Get icon base64 from file — use .ico on Windows, .png on macOS/Linux
+ * Get icon base64 from file — used for systray (mac/linux)
  */
 function getIconBase64() {
   const isWin = process.platform === "win32";
@@ -26,11 +27,9 @@ function getIconBase64() {
  */
 function isTraySupported() {
   const platform = process.platform;
-  // Supported platforms: darwin (macOS), win32 (Windows), linux
   if (!["darwin", "win32", "linux"].includes(platform)) {
     return false;
   }
-  // Skip on Linux without display (headless server)
   if (platform === "linux" && !process.env.DISPLAY) {
     return false;
   }
@@ -43,122 +42,204 @@ function isTraySupported() {
  * @returns {Object|null} tray instance or null if not supported/failed
  */
 function initTray(options) {
-  // Check OS support first
   if (!isTraySupported()) {
     return null;
   }
 
-  const { port, onQuit, onOpenDashboard } = options;
+  // Windows uses PowerShell NotifyIcon (AV-safe), others use systray
+  if (process.platform === "win32") {
+    return initWindowsTray(options);
+  }
+  return initUnixTray(options);
+}
 
+/**
+ * Build menu items array shared between platforms
+ */
+function buildMenuItems(port, autostartEnabled) {
+  return [
+    { title: `9Router (Port ${port})`, tooltip: "Server is running", enabled: false },
+    { title: "Open Dashboard", tooltip: "Open in browser", enabled: true },
+    {
+      title: autostartEnabled ? "✓ Auto-start Enabled" : "Enable Auto-start",
+      tooltip: "Run on OS startup",
+      enabled: true
+    },
+    { title: "Quit", tooltip: "Stop server and exit", enabled: true }
+  ];
+}
+
+// Menu item indexes
+const MENU_INDEX = { STATUS: 0, DASHBOARD: 1, AUTOSTART: 2, QUIT: 3 };
+
+/**
+ * Get current autostart state
+ */
+function getAutostartEnabled() {
   try {
-    const SysTray = require("systray").default;
+    const { isAutoStartEnabled } = require("./autostart");
+    return isAutoStartEnabled();
+  } catch (e) {
+    return false;
+  }
+}
 
-    // Check if autostart is enabled
-    let autostartEnabled = false;
+/**
+ * Handle menu item click (shared logic)
+ */
+function handleClick(index, options, onAutostartToggle) {
+  const { onQuit, onOpenDashboard, port } = options;
+  if (index === MENU_INDEX.DASHBOARD) {
+    if (onOpenDashboard) onOpenDashboard();
+    else openBrowser(`http://localhost:${port}/dashboard`);
+  } else if (index === MENU_INDEX.AUTOSTART) {
+    const enabled = getAutostartEnabled();
     try {
-      const { isAutoStartEnabled } = require("./autostart");
-      autostartEnabled = isAutoStartEnabled();
+      const { enableAutoStart, disableAutoStart } = require("./autostart");
+      if (enabled) disableAutoStart();
+      else enableAutoStart();
+      onAutostartToggle(!enabled);
     } catch (e) {}
+  } else if (index === MENU_INDEX.QUIT) {
+    console.log("\n👋 Shutting down...");
+    if (onQuit) onQuit();
+    killTray();
+    setTimeout(() => process.exit(0), 500);
+  }
+}
 
-    const isWin = process.platform === "win32";
-    const menu = {
-      icon: getIconBase64(),
-      // macOS requires empty title; Windows uses title as the tray icon tooltip
-      title: isWin ? `9Router - Port ${port}` : "",
+/**
+ * Windows tray via PowerShell NotifyIcon
+ */
+function initWindowsTray(options) {
+  const { port } = options;
+  try {
+    const { initWinTray } = require("./trayWin");
+    const iconPath = path.join(__dirname, "icon.ico");
+    const autostartEnabled = getAutostartEnabled();
+    const items = buildMenuItems(port, autostartEnabled);
+
+    trayInstance = initWinTray({
+      iconPath,
       tooltip: `9Router - Port ${port}`,
-      items: [
-        {
-          title: `9Router (Port ${port})`,
-          tooltip: "Server is running",
-          enabled: false
-        },
-        {
-          title: "Open Dashboard",
-          tooltip: "Open in browser",
-          enabled: true
-        },
-        {
-          title: autostartEnabled ? "✓ Auto-start Enabled" : "Enable Auto-start",
-          tooltip: "Run on OS startup",
-          enabled: true
-        },
-        {
-          title: "Quit",
-          tooltip: "Stop server and exit",
-          enabled: true
-        }
-      ]
-    };
-
-    trayInstance = new SysTray({
-      menu,
-      debug: false,
-      copyDir: true
-    });
-
-    // Menu item index: 0=status, 1=dashboard, 2=autostart, 3=quit
-    const AUTOSTART_INDEX = 2;
-
-    trayInstance.onClick((action) => {
-      if (action.item.title === "Open Dashboard") {
-        if (onOpenDashboard) {
-          onOpenDashboard();
-        } else {
-          openBrowser(`http://localhost:${port}/dashboard`);
-        }
-      } else if (action.item.title === "✓ Auto-start Enabled") {
-        // Disable autostart
-        try {
-          const { disableAutoStart } = require("./autostart");
-          disableAutoStart();
-          // Update menu item
-          trayInstance.sendAction({
-            type: "update-item",
-            item: {
-              title: "Enable Auto-start",
-              tooltip: "Run on OS startup",
-              enabled: true
-            },
-            seq_id: AUTOSTART_INDEX
-          });
-        } catch (e) {}
-      } else if (action.item.title === "Enable Auto-start") {
-        // Enable autostart
-        try {
-          const { enableAutoStart } = require("./autostart");
-          enableAutoStart();
-          // Update menu item
-          trayInstance.sendAction({
-            type: "update-item",
-            item: {
-              title: "✓ Auto-start Enabled",
-              tooltip: "Run on OS startup",
-              enabled: true
-            },
-            seq_id: AUTOSTART_INDEX
-          });
-        } catch (e) {}
-      } else if (action.item.title === "Quit") {
-        console.log("\n👋 Shutting down...");
-        if (onQuit) {
-          onQuit();
-        }
-        killTray();
-        setTimeout(() => process.exit(0), 500);
+      items,
+      onClick: (index) => {
+        handleClick(index, options, (newEnabled) => {
+          const newTitle = newEnabled ? "✓ Auto-start Enabled" : "Enable Auto-start";
+          trayInstance.updateItem(MENU_INDEX.AUTOSTART, newTitle, true);
+        });
       }
     });
 
-    trayInstance.onReady(() => {
-      // Tray ready - silent
+    isWinTray = true;
+    return trayInstance;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * macOS/Linux tray via systray binary
+ *
+ * Prefers `systray2` (active fork of `systray`, ships newer
+ * getlantern/systray-portable binaries that work on macOS 14+ and Apple
+ * Silicon under Rosetta). Falls back to legacy `systray@1.0.5` if systray2
+ * is not available, though that binary's Mach-O headers are rejected by
+ * modern dyld and the icon will not appear.
+ */
+function resolveSystray() {
+  let runtimeDir = null;
+  try {
+    const { getRuntimeNodeModules } = require("../../../hooks/sqliteRuntime");
+    runtimeDir = getRuntimeNodeModules();
+  } catch (e) {}
+
+  // 1) systray2 in runtime dir (where ensureTrayRuntime installs it)
+  if (runtimeDir) {
+    try { return { mod: require(path.join(runtimeDir, "systray2")).default, isV2: true }; } catch (e) {}
+  }
+  // 2) systray2 resolvable from the package's own node_modules / NODE_PATH
+  try { return { mod: require("systray2").default, isV2: true }; } catch (e) {}
+  // 3) Legacy systray fallback (unlikely to render on modern macOS)
+  try { return { mod: require("systray").default, isV2: false }; } catch (e) {}
+  if (runtimeDir) {
+    try { return { mod: require(path.join(runtimeDir, "systray")).default, isV2: false }; } catch (e) {}
+  }
+  return null;
+}
+
+function chmodTrayBin(pkgName) {
+  // systray2's npm tarball occasionally lands without +x on the bundled Go
+  // binary (observed on macOS). spawn() then fails with EACCES. Best-effort
+  // chmod on every init avoids a hard-to-diagnose silent tray failure.
+  try {
+    const { getRuntimeNodeModules } = require("../../../hooks/sqliteRuntime");
+    const binName = process.platform === "darwin" ? "tray_darwin_release" : "tray_linux_release";
+    const candidates = [
+      path.join(getRuntimeNodeModules(), pkgName, "traybin", binName),
+      path.join(__dirname, "..", "..", "..", "node_modules", pkgName, "traybin", binName)
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) fs.chmodSync(p, 0o755);
+    }
+  } catch (e) {}
+}
+
+function initUnixTray(options) {
+  const { port } = options;
+  try {
+    const resolved = resolveSystray();
+    if (!resolved) return null;
+    const { mod: SysTray, isV2 } = resolved;
+
+    chmodTrayBin(isV2 ? "systray2" : "systray");
+
+    const autostartEnabled = getAutostartEnabled();
+    const items = buildMenuItems(port, autostartEnabled);
+
+    const menu = {
+      icon: getIconBase64(),
+      // The bundled icon.png is a full-color RGBA logo. Don't mark it as a
+      // template icon: macOS would then render it as a solid white square
+      // because template mode only uses the alpha channel.
+      isTemplateIcon: false,
+      title: "",
+      tooltip: `9Router - Port ${port}`,
+      items
+    };
+
+    trayInstance = new SysTray({ menu, debug: false, copyDir: false });
+    isWinTray = false;
+
+    trayInstance.onClick((action) => {
+      handleClick(action.seq_id, options, (newEnabled) => {
+        trayInstance.sendAction({
+          type: "update-item",
+          item: {
+            title: newEnabled ? "✓ Auto-start Enabled" : "Enable Auto-start",
+            tooltip: "Run on OS startup",
+            enabled: true
+          },
+          seq_id: MENU_INDEX.AUTOSTART
+        });
+      });
     });
 
-    trayInstance.onError((err) => {
-      // Ignore errors during shutdown
-    });
+    if (isV2) {
+      // systray2 exposes a ready() promise instead of onReady/onError. Surface
+      // failures (binary crash, EACCES, etc.) so users can see why the icon
+      // didn't appear instead of getting a misleading "running in tray" log.
+      trayInstance.ready().catch((err) => {
+        process.stderr.write(`[9router] tray failed to start: ${err && err.message ? err.message : err}\n`);
+      });
+    } else {
+      trayInstance.onReady(() => {});
+      trayInstance.onError(() => {});
+    }
 
     return trayInstance;
   } catch (err) {
-    // Silent fail - tray is optional, app continues without it
+    process.stderr.write(`[9router] tray init error: ${err.message}\n`);
     return null;
   }
 }
@@ -168,15 +249,17 @@ function initTray(options) {
  */
 function killTray() {
   const instance = trayInstance;
-  trayInstance = null; // Set to null first to prevent error handlers
-  
+  const wasWin = isWinTray;
+  trayInstance = null;
+
   if (instance) {
     try {
-      // Kill with silent mode to avoid JSON parse errors
-      instance.kill(true);
-    } catch (e) {
-      // Ignore kill errors - tray binary may already be dead
-    }
+      if (wasWin) instance.kill();
+      // systray2.kill(true) defaults to calling process.exit(0) which aborts
+      // the rest of cleanup (server SIGKILL, MITM/tunnel cleanup). Pass false
+      // so callers stay in control of process exit.
+      else instance.kill(false);
+    } catch (e) {}
   }
 }
 

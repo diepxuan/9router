@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 
 const TUNNEL_BENEFITS = [
@@ -44,6 +44,7 @@ export default function APIPageClient({ machineId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [requireLogin, setRequireLogin] = useState(true);
@@ -466,6 +467,8 @@ export default function APIPageClient({ machineId }) {
           } else if (event === "done") {
             setTsInstalled(true);
             setTsInstalling(false);
+            setShowTsModal(false);
+            handleConnectTailscale();
             return;
           } else if (event === "error") {
             setTsStatus({ type: "error", message: data.error || "Install failed" });
@@ -628,8 +631,7 @@ export default function APIPageClient({ machineId }) {
     setTsStatus(null);
     setTsInstallLog([]);
     const data = await checkTailscaleInstalled();
-    if (data?.installed) {
-      // Skip modal, connect directly when already installed
+    if (data?.installed && data?.hasCachedPassword) {
       handleConnectTailscale();
     } else {
       setShowTsModal(true);
@@ -659,22 +661,26 @@ export default function APIPageClient({ machineId }) {
   };
 
   const handleDeleteKey = async (id) => {
-    if (!confirm("Delete this API key?")) return;
-
-    try {
-      const res = await fetch(`/api/keys/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setKeys(keys.filter((k) => k.id !== id));
-        // Clean up visibility state
-        setVisibleKeys(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
+    setConfirmState({
+      title: "Delete API Key",
+      message: "Delete this API key?",
+      onConfirm: async () => {
+        setConfirmState(null);
+        try {
+          const res = await fetch(`/api/keys/${id}`, { method: "DELETE" });
+          if (res.ok) {
+            setKeys(keys.filter((k) => k.id !== id));
+            setVisibleKeys(prev => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }
+        } catch (error) {
+          console.log("Error deleting key:", error);
+        }
       }
-    } catch (error) {
-      console.log("Error deleting key:", error);
-    }
+    });
   };
 
   const handleToggleKey = async (id, isActive) => {
@@ -1104,9 +1110,14 @@ export default function APIPageClient({ machineId }) {
                     checked={key.isActive ?? true}
                     onChange={(checked) => {
                       if (key.isActive && !checked) {
-                        if (confirm(`Pause API key "${key.name}"?\n\nThis key will stop working immediately but can be resumed later.`)) {
-                          handleToggleKey(key.id, checked);
-                        }
+                        setConfirmState({
+                          title: "Pause API Key",
+                          message: `Pause API key "${key.name}"?\n\nThis key will stop working immediately but can be resumed later.`,
+                          onConfirm: async () => {
+                            setConfirmState(null);
+                            handleToggleKey(key.id, checked);
+                          }
+                        });
                       } else {
                         handleToggleKey(key.id, checked);
                       }
@@ -1340,6 +1351,16 @@ export default function APIPageClient({ machineId }) {
           </div>
         </div>
       </Modal>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={confirmState?.onConfirm}
+        title={confirmState?.title || "Confirm"}
+        message={confirmState?.message}
+        variant="danger"
+      />
     </div>
   );
 }

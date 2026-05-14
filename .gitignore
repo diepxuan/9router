@@ -55,7 +55,6 @@ docs/*
 !docs/TROUBLESHOOTING.md
 !docs/UPDATE-*.md
 test/*
-bin/*
 open-sse/test/*
 RM.vn.md
 RM.md
@@ -76,3 +75,4 @@ ecosystem.config.*
 scripts/agSniffer/*
 scripts/sync.sh
 gitbooks/*
+gitbook/README.md
