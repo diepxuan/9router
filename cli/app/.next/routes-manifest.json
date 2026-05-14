@@ -65,6 +65,22 @@
       "namedRegex": "^/api/keys/(?<nxtPid>[^/]+?)(?:/)?$"
     },
     {
+      "page": "/api/mcp/[plugin]/message",
+      "regex": "^/api/mcp/([^/]+?)/message(?:/)?$",
+      "routeKeys": {
+        "nxtPplugin": "nxtPplugin"
+      },
+      "namedRegex": "^/api/mcp/(?<nxtPplugin>[^/]+?)/message(?:/)?$"
+    },
+    {
+      "page": "/api/mcp/[plugin]/sse",
+      "regex": "^/api/mcp/([^/]+?)/sse(?:/)?$",
+      "routeKeys": {
+        "nxtPplugin": "nxtPplugin"
+      },
+      "namedRegex": "^/api/mcp/(?<nxtPplugin>[^/]+?)/sse(?:/)?$"
+    },
+    {
       "page": "/api/oauth/[provider]/[action]",
       "regex": "^/api/oauth/([^/]+?)/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -219,6 +235,30 @@
       "namedRegex": "^/api/auth/logout(?:/)?$"
     },
     {
+      "page": "/api/auth/oidc/callback",
+      "regex": "^/api/auth/oidc/callback(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/oidc/callback(?:/)?$"
+    },
+    {
+      "page": "/api/auth/oidc/start",
+      "regex": "^/api/auth/oidc/start(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/oidc/start(?:/)?$"
+    },
+    {
+      "page": "/api/auth/oidc/test",
+      "regex": "^/api/auth/oidc/test(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/oidc/test(?:/)?$"
+    },
+    {
+      "page": "/api/auth/status",
+      "regex": "^/api/auth/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/status(?:/)?$"
+    },
+    {
       "page": "/api/cli-tools/all-statuses",
       "regex": "^/api/cli\\-tools/all\\-statuses(?:/)?$",
       "routeKeys": {},
@@ -241,6 +281,12 @@
       "regex": "^/api/cli\\-tools/claude\\-settings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/cli\\-tools/claude\\-settings(?:/)?$"
+    },
+    {
+      "page": "/api/cli-tools/cline-settings",
+      "regex": "^/api/cli\\-tools/cline\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cli\\-tools/cline\\-settings(?:/)?$"
     },
     {
       "page": "/api/cli-tools/codex-settings",
@@ -273,6 +319,12 @@
       "namedRegex": "^/api/cli\\-tools/cowork\\-settings(?:/)?$"
     },
     {
+      "page": "/api/cli-tools/deepseek-tui-settings",
+      "regex": "^/api/cli\\-tools/deepseek\\-tui\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cli\\-tools/deepseek\\-tui\\-settings(?:/)?$"
+    },
+    {
       "page": "/api/cli-tools/droid-settings",
       "regex": "^/api/cli\\-tools/droid\\-settings(?:/)?$",
       "routeKeys": {},
@@ -283,6 +335,12 @@
       "regex": "^/api/cli\\-tools/hermes\\-settings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/cli\\-tools/hermes\\-settings(?:/)?$"
+    },
+    {
+      "page": "/api/cli-tools/kilo-settings",
+      "regex": "^/api/cli\\-tools/kilo\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cli\\-tools/kilo\\-settings(?:/)?$"
     },
     {
       "page": "/api/cli-tools/openclaw-settings",
@@ -367,6 +425,12 @@
       "regex": "^/api/media\\-providers/tts/inworld/voices(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/media\\-providers/tts/inworld/voices(?:/)?$"
+    },
+    {
+      "page": "/api/media-providers/tts/minimax/voices",
+      "regex": "^/api/media\\-providers/tts/minimax/voices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/media\\-providers/tts/minimax/voices(?:/)?$"
     },
     {
       "page": "/api/media-providers/tts/voices",
