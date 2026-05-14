@@ -149,8 +149,8 @@
   "/(dashboard)/dashboard/translator/page": "app/(dashboard)/dashboard/translator/page.js",
   "/(dashboard)/dashboard/usage/page": "app/(dashboard)/dashboard/usage/page.js",
   "/(dashboard)/dashboard/console-log/page": "app/(dashboard)/dashboard/console-log/page.js",
-  "/(dashboard)/dashboard/profile/page": "app/(dashboard)/dashboard/profile/page.js",
   "/(dashboard)/dashboard/providers/page": "app/(dashboard)/dashboard/providers/page.js",
+  "/(dashboard)/dashboard/providers/[id]/page": "app/(dashboard)/dashboard/providers/[id]/page.js",
   "/(dashboard)/dashboard/proxy-pools/page": "app/(dashboard)/dashboard/proxy-pools/page.js",
-  "/(dashboard)/dashboard/providers/[id]/page": "app/(dashboard)/dashboard/providers/[id]/page.js"
+  "/(dashboard)/dashboard/profile/page": "app/(dashboard)/dashboard/profile/page.js"
 }
