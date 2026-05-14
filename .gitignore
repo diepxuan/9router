@@ -76,3 +76,6 @@ scripts/agSniffer/*
 scripts/sync.sh
 gitbooks/*
 gitbook/README.md
+
+# Local agent memory
+memory/
