@@ -81,7 +81,7 @@ export async function handleSearch(request) {
     });
   };
 
-  const comboModels = providerInput ? getComboModelsFromData(providerInput, combos) : null;
+  const comboModels = typeof providerInput === "string" ? getComboModelsFromData(providerInput, combos) : null;
   if (comboModels) {
     return runCombo({ name: providerInput, models: comboModels }, `Combo "${providerInput}" selected`);
   }
