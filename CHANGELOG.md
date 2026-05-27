@@ -1,5 +1,8 @@
 # Unreleased
 
+## Changes
+- Remove donation UI and donation API configuration from the dashboard header.
+
 ## Documentation
 - Add `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` to document fork-only features and post-upstream-merge verification steps.
 
