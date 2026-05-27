@@ -3,6 +3,9 @@
 ## Documentation
 - Add `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` to document fork-only features and post-upstream-merge verification steps.
 
+## Fixes
+- Combo fallback: immediately try the next model on timeout/transient upstream errors instead of sleeping before fallback.
+
 # v0.4.63 (2026-05-26)
 
 ## Fixes
