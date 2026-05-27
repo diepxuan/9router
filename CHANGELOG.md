@@ -1,3 +1,8 @@
+# Unreleased
+
+## Documentation
+- Add `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` to document fork-only features and post-upstream-merge verification steps.
+
 # v0.4.63 (2026-05-26)
 
 ## Fixes
