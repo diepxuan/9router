@@ -6,7 +6,7 @@ import { getUsageForProvider } from "open-sse/services/usage.js";
 import { getExecutor } from "open-sse/executors/index.js";
 import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 import { USAGE_APIKEY_PROVIDERS } from "@/shared/constants/providers";
-import { hasManualQuota, getManualQuota } from "@/lib/db/repos/manualQuotaRepo.js";
+import { hasManualQuota, getManualQuota } from "@/diepxuan/lib/db/repos/manualQuotaRepo.js";
 
 // Detect auth-expired messages returned by usage providers instead of throwing
 const AUTH_EXPIRED_PATTERNS = ["expired", "authentication", "unauthorized", "401", "re-authorize"];
