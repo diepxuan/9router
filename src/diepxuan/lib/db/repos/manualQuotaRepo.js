@@ -12,8 +12,8 @@
  * Số liệu local chỉ mang tính tham khảo, gần đúng.
  */
 
-import { getAdapter } from "../driver.js";
-import { parseJson } from "../helpers/jsonCol.js";
+import { getAdapter } from "@/lib/db/driver.js";
+import { parseJson } from "@/lib/db/helpers/jsonCol.js";
 
 // ─── AliCode quota plan definitions ─────────────────────────────────────────
 export const ALICODE_PLANS = {
