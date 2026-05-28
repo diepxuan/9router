@@ -112,8 +112,8 @@
   "/api/providers/client/route": "/api/providers/client",
   "/api/providers/suggested-models/route": "/api/providers/suggested-models",
   "/api/providers/route": "/api/providers",
-  "/api/proxy-pools/[id]/route": "/api/proxy-pools/[id]",
   "/api/proxy-pools/[id]/test/route": "/api/proxy-pools/[id]/test",
+  "/api/proxy-pools/[id]/route": "/api/proxy-pools/[id]",
   "/api/proxy-pools/cloudflare-deploy/route": "/api/proxy-pools/cloudflare-deploy",
   "/api/proxy-pools/deno-deploy/route": "/api/proxy-pools/deno-deploy",
   "/api/proxy-pools/route": "/api/proxy-pools",
@@ -149,7 +149,7 @@
   "/(dashboard)/dashboard/usage/page": "/dashboard/usage",
   "/(dashboard)/dashboard/console-log/page": "/dashboard/console-log",
   "/(dashboard)/dashboard/profile/page": "/dashboard/profile",
+  "/(dashboard)/dashboard/providers/[id]/page": "/dashboard/providers/[id]",
   "/(dashboard)/dashboard/providers/page": "/dashboard/providers",
-  "/(dashboard)/dashboard/proxy-pools/page": "/dashboard/proxy-pools",
-  "/(dashboard)/dashboard/providers/[id]/page": "/dashboard/providers/[id]"
+  "/(dashboard)/dashboard/proxy-pools/page": "/dashboard/proxy-pools"
 }
