@@ -82,3 +82,6 @@ gitbook/README.md
 
 # Local agent memory
 memory/
+
+# OpenClaw internal state
+.openclaw/
