@@ -55,6 +55,7 @@ docs/*
 !docs/PROVIDERS.md
 !docs/RTK.md
 !docs/TROUBLESHOOTING.md
+!docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md
 !docs/UPDATE-*.md
 test/*
 open-sse/test/*
