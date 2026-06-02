@@ -25,7 +25,7 @@ kill -9 <PID>
 
 **Default password:** `123456`
 
-Change it after first login in Settings.
+For local-only use, change it after first login in Settings. Before exposing the dashboard outside localhost, set a strong `INITIAL_PASSWORD` and protect `$DATA_DIR/db/data.sqlite`.
 
 ### Dashboard shows "Connection Error" for provider
 
@@ -244,6 +244,6 @@ curl http://localhost:20128/api/usage
 
 ## Getting Help
 
-- GitHub Issues: https://github.com/decolua/9router/issues
-- Documentation: https://github.com/decolua/9router/docs
-- Community: Check project README for links
+- Local dashboard: http://localhost:20128/dashboard
+- Fork workspace docs: `docs/`
+- Upstream reference is read-only for this workspace
