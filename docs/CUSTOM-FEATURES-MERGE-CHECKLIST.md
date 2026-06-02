@@ -439,6 +439,11 @@ npm run build
 ### Lưu ý
 
 - Không tự ý push/trigger deploy production nếu Sếp chưa duyệt.
+
+### Domain separation rule
+
+Fork-only code should live under `src/diepxuan/**` and `open-sse/diepxuan/**` whenever practical. Base files should only contain small hooks/bridges and must fail safely so upstream-compatible behavior remains available if a fork module is disabled or broken.
+
 - Sau merge upstream, kiểm tra workflow không tạo PR/push nhầm upstream.
 
 ---
@@ -530,11 +535,11 @@ npm run start
 Sau đó kiểm tra:
 
 ```bash
-curl -sS http://localhost:3000/api/health
-curl -sS http://localhost:3000/api/v1/models | jq .
+curl -sS http://localhost:20128/api/health
+curl -sS http://localhost:20128/api/v1/models | jq .
 ```
 
-Nếu app dùng port khác theo config/runtime, thay `3000` bằng port thực tế.
+Port chuẩn local của workspace là `20128`. Nếu runtime override port, thay `20128` bằng port thực tế.
 
 Smoke test theo feature:
 - AliCode provider: thêm connection, validate key, gọi chat completion.

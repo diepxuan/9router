@@ -1,6 +1,6 @@
 # 9Router Architecture
 
-_Last updated: 2026-05-09_
+_Last updated: 2026-06-02_
 
 ## Executive Summary
 
@@ -28,6 +28,18 @@ Primary runtime model:
 
 - Next.js app routes under `src/app/api/*` implement both dashboard APIs and compatibility APIs
 - A shared SSE/routing core in `src/sse/*` + `open-sse/*` handles provider execution, translation, streaming, fallback, and usage
+
+
+## Local Fork Boundaries
+
+This workspace is the local `diepxuan/9router` fork. It is operated locally and does not create PRs against upstream `decolua/9router`.
+
+Fork-only customizations should stay under:
+
+- `src/diepxuan/**`
+- `open-sse/diepxuan/**`
+
+Base-source changes should be limited to small hooks/bridges with safe fallback. If a fork module fails, the base 9Router runtime should continue without breaking upstream-compatible behavior.
 
 ## Scope and Boundaries
 
@@ -112,7 +124,7 @@ Extended endpoints (v0.4.18+):
 - `src/app/api/v1/audio/speech` — TTS (Text-to-Speech)
 - `src/app/api/v1/images/generations` — Image generation
 - `src/app/api/v1/search` — Web search
-- `src/app/api/v1/fetch` — Web fetch (URL → markdown)
+- `src/app/api/v1/web/fetch` — Web fetch (URL → markdown)
 
 Management APIs:
 
@@ -266,7 +278,7 @@ TTS providers: OpenAI, ElevenLabs, Deepgram, Edge TTS, Google TTS, Hyperbolic, I
 | `/v1/audio/voices` | API route | List available TTS voices |
 | `/v1/images/generations` | `imageGeneration.js` | Image generation (incl. Cloudflare Workers AI) |
 | `/v1/search` | `search.js` | Web search |
-| `/v1/fetch` | `fetch.js` | Web fetch (URL → markdown) |
+| `/v1/web/fetch` | `fetch.js` | Web fetch (URL → markdown) |
 | `/v1/models/info` | API route | Model metadata |
 
 ### 9) Tailscale Tunnel (v0.4.25+)
