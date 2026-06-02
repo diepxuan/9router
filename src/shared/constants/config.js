@@ -1,4 +1,5 @@
 import pkg from "../../../package.json" with { type: "json" };
+import { DIEPXUAN_PROVIDER_ENDPOINTS } from "@/diepxuan/shared/constants/config.js";
 
 // App configuration
 export const APP_CONFIG = {
@@ -10,7 +11,6 @@ export const APP_CONFIG = {
 // GitHub configuration
 export const GITHUB_CONFIG = {
   changelogUrl: "https://raw.githubusercontent.com/decolua/9router/refs/heads/master/CHANGELOG.md",
-  donateUrl: "https://9router.com/api/donate",
 };
 
 // Updater configuration
@@ -63,24 +63,21 @@ export const CONSOLE_LOG_CONFIG = {
 export const CLIENT_STORE_TTL_MS = 60000;
 
 // Provider API endpoints (for display only)
-export const PROVIDER_ENDPOINTS = {
+const _BASE_PROVIDER_ENDPOINTS = {
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   glm: "https://api.z.ai/api/anthropic/v1/messages",
   "glm-cn": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
   kimi: "https://api.kimi.com/coding/v1/messages",
   minimax: "https://api.minimax.io/anthropic/v1/messages",
   "minimax-cn": "https://api.minimaxi.com/anthropic/v1/messages",
-  alicode: "https://coding.dashscope.aliyuncs.com/v1/chat/completions",
-  "alicode-intl": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
-  "volcengine-ark": "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
   byteplus: "https://ark.ap-southeast.bytepluses.com/api/coding/v3/chat/completions",
   openai: "https://api.openai.com/v1/chat/completions",
-  "vercel-ai-gateway": "https://ai-gateway.vercel.sh/v1/chat/completions",
   anthropic: "https://api.anthropic.com/v1/messages",
   gemini: "https://generativelanguage.googleapis.com/v1beta/models",
   ollama: "https://ollama.com/api/chat",
   "ollama-local": "http://localhost:11434/api/chat",
 };
+export const PROVIDER_ENDPOINTS = { ..._BASE_PROVIDER_ENDPOINTS, ...DIEPXUAN_PROVIDER_ENDPOINTS };
 
 // Re-export from providers.js for backward compatibility
 export {

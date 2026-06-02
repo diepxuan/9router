@@ -4,6 +4,7 @@
 
 import { CLIENT_METADATA, getPlatformUserAgent } from "../config/appConstants.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
+import { getGlmUsage as _getGlmUsage, getMiniMaxUsage as _getMiniMaxUsage, getAlicodeUsage as _getAlicodeUsage } from "../diepxuan/services/usage.js";
 
 // GitHub API config
 const GITHUB_CONFIG = {
@@ -11,22 +12,9 @@ const GITHUB_CONFIG = {
   userAgent: "GitHubCopilotChat/0.26.7",
 };
 
-// GLM quota endpoints (region-aware)
-const GLM_QUOTA_URLS = {
-  international: "https://api.z.ai/api/monitor/usage/quota/limit",
-  china: "https://open.bigmodel.cn/api/monitor/usage/quota/limit",
-};
-
-// MiniMax usage endpoints (try in order, fallback on transient errors)
-const MINIMAX_USAGE_URLS = {
-  minimax: [
-    "https://www.minimax.io/v1/token_plan/remains",
-    "https://api.minimax.io/v1/api/openplatform/coding_plan/remains",
-  ],
-  "minimax-cn": [
-    "https://www.minimaxi.com/v1/api/openplatform/coding_plan/remains",
-    "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains",
-  ],
+// Safe wrapper for custom usage functions
+const safeCall = async (fn, ...args) => {
+  try { return await fn(...args); } catch (e) { return { message: `Custom usage error: ${e.message}` }; }
 };
 
 // Antigravity API config (from Quotio)
@@ -87,10 +75,13 @@ export async function getUsageForProvider(connection, proxyOptions = null) {
       return await getOllamaUsage(accessToken);
     case "glm":
     case "glm-cn":
-      return await getGlmUsage(apiKey, provider, proxyOptions);
+      return await safeCall(_getGlmUsage, apiKey, provider, proxyOptions);
     case "minimax":
     case "minimax-cn":
-      return await getMiniMaxUsage(apiKey, provider, proxyOptions);
+      return await safeCall(_getMiniMaxUsage, apiKey, provider, proxyOptions);
+    case "alicode":
+    case "alicode-intl":
+      return await safeCall(_getAlicodeUsage, apiKey, provider, proxyOptions);
     default:
       return { message: `Usage API not implemented for ${provider}` };
   }
@@ -920,296 +911,5 @@ async function getOllamaUsage(accessToken, providerSpecificData) {
     };
   } catch (error) {
     return { message: "Unable to fetch Ollama Cloud usage." };
-  }
-}
-
-/**
- * GLM Coding Plan usage (international + China regions)
- */
-async function getGlmUsage(apiKey, provider, proxyOptions = null) {
-  if (!apiKey) {
-    return { message: "GLM API key not available." };
-  }
-
-  const region = provider === "glm-cn" ? "china" : "international";
-  const quotaUrl = GLM_QUOTA_URLS[region];
-
-  try {
-    const response = await proxyAwareFetch(quotaUrl, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json",
-      },
-    }, proxyOptions);
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        return { message: "GLM API key invalid or expired." };
-      }
-      return { message: `GLM quota API error (${response.status}).` };
-    }
-
-    const json = await response.json();
-    const data = json?.data && typeof json.data === "object" ? json.data : {};
-    const limits = Array.isArray(data.limits) ? data.limits : [];
-    const quotas = {};
-
-    for (const limit of limits) {
-      if (!limit || limit.type !== "TOKENS_LIMIT") continue;
-      const usedPercent = Number(limit.percentage) || 0;
-      const resetMs = Number(limit.nextResetTime) || 0;
-      const remaining = Math.max(0, 100 - usedPercent);
-
-      quotas["session"] = {
-        used: usedPercent,
-        total: 100,
-        remaining,
-        remainingPercentage: remaining,
-        resetAt: resetMs > 0 ? new Date(resetMs).toISOString() : null,
-        unlimited: false,
-      };
-    }
-
-    const levelRaw = typeof data.level === "string" ? data.level : "";
-    const plan = levelRaw
-      ? levelRaw.charAt(0).toUpperCase() + levelRaw.slice(1).toLowerCase()
-      : "Unknown";
-
-    return { plan, quotas };
-  } catch (error) {
-    return { message: `GLM error: ${error.message}` };
-  }
-}
-
-// ── MiniMax helpers ──────────────────────────────────────────────────────
-function getMiniMaxField(model, snakeKey, camelKey) {
-  if (!model || typeof model !== "object") return null;
-  return model[snakeKey] ?? model[camelKey] ?? null;
-}
-
-function getMiniMaxModelName(model) {
-  return String(getMiniMaxField(model, "model_name", "modelName") || "").trim();
-}
-
-function formatMiniMaxQuotaName(model) {
-  const rawName = getMiniMaxModelName(model);
-  if (!rawName) return "MiniMax";
-
-  return rawName
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (ch) => ch.toUpperCase())
-    .replace(/\bTo\b/g, "to")
-    .replace(/\bTts\b/g, "TTS")
-    .replace(/\bHd\b/g, "HD");
-}
-
-function getMiniMaxSessionTotal(model) {
-  return Math.max(0, Number(getMiniMaxField(model, "current_interval_total_count", "currentIntervalTotalCount")) || 0);
-}
-
-function getMiniMaxWeeklyTotal(model) {
-  return Math.max(0, Number(getMiniMaxField(model, "current_weekly_total_count", "currentWeeklyTotalCount")) || 0);
-}
-
-function hasMiniMaxQuota(model) {
-  return getMiniMaxSessionTotal(model) > 0 || getMiniMaxWeeklyTotal(model) > 0;
-}
-
-function getMiniMaxResetAt(model, capturedAtMs, remainsSnake, remainsCamel, endSnake, endCamel) {
-  const remainsMs = Number(getMiniMaxField(model, remainsSnake, remainsCamel)) || 0;
-  if (remainsMs > 0) return new Date(capturedAtMs + remainsMs).toISOString();
-  return parseResetTime(getMiniMaxField(model, endSnake, endCamel));
-}
-
-function buildMiniMaxQuota(total, count, resetAt, countMeansRemaining) {
-  const safeTotal = Math.max(0, total);
-  const used = countMeansRemaining ? Math.max(safeTotal - count, 0) : Math.min(Math.max(0, count), safeTotal);
-  const remaining = Math.max(safeTotal - used, 0);
-  return {
-    used,
-    total: safeTotal,
-    remaining,
-    remainingPercentage: safeTotal > 0 ? Math.max(0, Math.min(100, (remaining / safeTotal) * 100)) : 0,
-    resetAt,
-    unlimited: false,
-  };
-}
-
-function addMiniMaxQuota(quotas, key, model, getTotal, countSnake, countCamel, resetArgs, countMeansRemaining) {
-  const total = getTotal(model);
-  if (total <= 0) return;
-
-  const count = Math.max(0, Number(getMiniMaxField(model, countSnake, countCamel)) || 0);
-  quotas[key] = buildMiniMaxQuota(
-    total,
-    count,
-    getMiniMaxResetAt(model, ...resetArgs),
-    countMeansRemaining
-  );
-}
-
-/**
- * MiniMax Token Plan / Coding Plan usage
- */
-async function getMiniMaxUsage(apiKey, provider, proxyOptions = null) {
-  if (!apiKey) {
-    return { message: "MiniMax API key not available." };
-  }
-
-  const usageUrls = MINIMAX_USAGE_URLS[provider] || [];
-  let lastErrorMessage = "";
-
-  for (let index = 0; index < usageUrls.length; index += 1) {
-    const usageUrl = usageUrls[index];
-    const canFallback = index < usageUrls.length - 1;
-
-    try {
-      const response = await proxyAwareFetch(usageUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-      }, proxyOptions);
-
-      const rawText = await response.text();
-      let payload = {};
-      if (rawText) {
-        try { payload = JSON.parse(rawText); } catch { payload = {}; }
-      }
-
-      const baseResp = (payload?.base_resp ?? payload?.baseResp) || {};
-      const apiStatusCode = Number(baseResp.status_code ?? baseResp.statusCode) || 0;
-      const apiStatusMessage = String(baseResp.status_msg ?? baseResp.statusMsg ?? "").trim();
-      const combined = `${apiStatusMessage} ${rawText}`.trim();
-      const authLike = /token plan|coding plan|invalid api key|invalid key|unauthorized|inactive/i;
-
-      if (response.status === 401 || response.status === 403 || apiStatusCode === 1004 || authLike.test(combined)) {
-        return { message: "MiniMax API key invalid or inactive. Use an active Token/Coding Plan key." };
-      }
-
-      if (!response.ok) {
-        lastErrorMessage = `MiniMax usage endpoint error (${response.status})`;
-        if ((response.status === 404 || response.status === 405 || response.status >= 500) && canFallback) continue;
-        return { message: `MiniMax connected. ${lastErrorMessage}` };
-      }
-
-      if (apiStatusCode !== 0) {
-        return { message: `MiniMax connected. ${apiStatusMessage || "Upstream quota API error"}` };
-      }
-
-      const modelRemains = payload?.model_remains ?? payload?.modelRemains;
-      const allModels = Array.isArray(modelRemains) ? modelRemains : [];
-      const quotaModels = allModels.filter(hasMiniMaxQuota);
-
-      if (quotaModels.length === 0) {
-        return { message: "MiniMax connected. No quota data was returned." };
-      }
-
-      const capturedAtMs = Date.now();
-      const countMeansRemaining = usageUrl.includes("/coding_plan/remains");
-      const quotas = {};
-
-      for (const model of quotaModels) {
-        const displayName = formatMiniMaxQuotaName(model);
-        addMiniMaxQuota(
-          quotas,
-          `${displayName} (5h)`,
-          model,
-          getMiniMaxSessionTotal,
-          "current_interval_usage_count",
-          "currentIntervalUsageCount",
-          [capturedAtMs, "remains_time", "remainsTime", "end_time", "endTime"],
-          countMeansRemaining
-        );
-
-        addMiniMaxQuota(
-          quotas,
-          `${displayName} (7d)`,
-          model,
-          getMiniMaxWeeklyTotal,
-          "current_weekly_usage_count",
-          "currentWeeklyUsageCount",
-          [capturedAtMs, "weekly_remains_time", "weeklyRemainsTime", "weekly_end_time", "weeklyEndTime"],
-          countMeansRemaining
-        );
-      }
-
-      if (Object.keys(quotas).length === 0) {
-        return { message: "MiniMax connected. Unable to extract quota usage." };
-      }
-
-      return { quotas };
-    } catch (error) {
-      lastErrorMessage = error.message;
-      if (!canFallback) break;
-    }
-  }
-
-  return { message: lastErrorMessage ? `MiniMax connected. Unable to fetch usage: ${lastErrorMessage}` : "MiniMax connected. Unable to fetch usage." };
-}
-
-async function getQoderUsage(accessToken, proxyOptions = null) {
-  if (!accessToken) {
-    return { message: "Qoder usage unavailable: no access token" };
-  }
-  try {
-    const response = await proxyAwareFetch(
-      "https://openapi.qoder.sh/api/v2/quota/usage",
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-      },
-      proxyOptions,
-    );
-    if (!response.ok) {
-      return { message: `Qoder connected. Usage fetch returned ${response.status}.` };
-    }
-    const body = await response.json().catch(() => null);
-    if (!body) {
-      return { message: "Qoder connected. Usage response was not JSON." };
-    }
-    // Quota records live under `quotas`; scalar metadata
-    // (totalUsagePercentage, isQuotaExceeded, expiresAt) are surfaced as
-    // siblings so the dashboard parser doesn't try to render them as rows.
-    const userQuota = body.userQuota || {};
-    const orgQuota = body.orgResourcePackage || {};
-    // Qoder publishes a single absolute reset timestamp (`expiresAt` in ms);
-    // surface it on every quota record as ISO so the table can render
-    // "resets at" alongside used/total.
-    const expiresAtMs = Number.isFinite(Number(body.expiresAt)) && Number(body.expiresAt) > 0
-      ? Number(body.expiresAt)
-      : null;
-    const resetAt = expiresAtMs ? new Date(expiresAtMs).toISOString() : null;
-    const quotas = {
-      user: {
-        total: Number(userQuota.total) || 0,
-        used: Number(userQuota.used) || 0,
-        remaining: Number(userQuota.remaining) || 0,
-        unit: userQuota.unit || "credits",
-        resetAt,
-      },
-      organization: {
-        total: Number(orgQuota.total) || 0,
-        used: Number(orgQuota.used) || 0,
-        remaining: Number(orgQuota.remaining) || 0,
-        unit: orgQuota.unit || "credits",
-        resetAt,
-      },
-    };
-    return {
-      quotas,
-      totalUsagePercentage: Number(body.totalUsagePercentage) || 0,
-      isQuotaExceeded: !!body.isQuotaExceeded,
-      expiresAt: expiresAtMs,
-    };
-  } catch (error) {
-    return { message: `Qoder connected. Unable to fetch usage: ${error.message}` };
   }
 }

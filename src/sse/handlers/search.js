@@ -58,11 +58,6 @@ export async function handleSearch(request) {
     }
   }
 
-  if (!providerInput || typeof providerInput !== "string") {
-    log.warn("SEARCH", "Missing provider/model");
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: provider (or model)");
-  }
-
   if (!query || typeof query !== "string" || !query.trim()) {
     log.warn("SEARCH", "Missing query");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: query");
@@ -70,21 +65,41 @@ export async function handleSearch(request) {
 
   // Combo expansion: providerInput may be a combo name → run fallback/round-robin across providers
   const combos = await getCombos();
-  const comboModels = getComboModelsFromData(providerInput, combos);
-  if (comboModels) {
+  const runCombo = (combo, reason) => {
     const comboStrategies = settings.comboStrategies || {};
-    const comboStrategy = comboStrategies[providerInput]?.fallbackStrategy || settings.comboStrategy || "fallback";
+    const comboStrategy = comboStrategies[combo.name]?.fallbackStrategy || settings.comboStrategy || "fallback";
     const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-    log.info("SEARCH", `Combo "${providerInput}" with ${comboModels.length} providers (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+    log.info("SEARCH", `${reason}, using combo "${combo.name}" with ${combo.models.length} providers (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
     return handleComboChat({
       body,
-      models: comboModels,
+      models: combo.models,
       handleSingleModel: (b, m) => handleSingleProviderSearch(b, m, request, apiKey, settings),
       log,
-      comboName: providerInput,
+      comboName: combo.name,
       comboStrategy,
       comboStickyLimit
     });
+  };
+
+  const comboModels = typeof providerInput === "string" ? getComboModelsFromData(providerInput, combos) : null;
+  if (comboModels) {
+    return runCombo({ name: providerInput, models: comboModels }, `Combo "${providerInput}" selected`);
+  }
+
+  const firstCombo = combos.find(c => c.kind === "webSearch" && c.models && c.models.length > 0);
+
+  if (!providerInput || typeof providerInput !== "string") {
+    if (firstCombo) return runCombo(firstCombo, "No provider/model specified");
+    log.warn("SEARCH", "No provider/model and no webSearch combo available");
+    return errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "No provider/model specified and no webSearch combo configured");
+  }
+
+  const providerId = resolveProviderId(providerInput);
+  const resolvedProvider = AI_PROVIDERS[providerId];
+  if (!resolvedProvider) {
+    if (firstCombo) return runCombo(firstCombo, `Unknown provider "${providerInput}"`);
+    log.warn("SEARCH", `Unknown provider "${providerInput}" and no webSearch combo available`);
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, `Unknown provider: ${providerInput}`);
   }
 
   return handleSingleProviderSearch(body, providerInput, request, apiKey, settings);
