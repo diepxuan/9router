@@ -230,11 +230,23 @@ Expose 9Router over Tailscale:
 | `NEXT_PUBLIC_BASE_URL` | - | Dashboard base URL |
 | `DATA_DIR` | ~/.9router | Database directory |
 | `JWT_SECRET` | auto-generated | Dashboard auth |
-| `INITIAL_PASSWORD` | 123456 | Default admin password |
+| `INITIAL_PASSWORD` | 123456 | Initial admin password; change for any non-local exposure |
 | `API_KEY_SECRET` | auto-generated | API key HMAC |
 | `MACHINE_ID_SALT` | auto-generated | Machine ID |
 | `ENABLE_REQUEST_LOGS` | false | Detailed logging |
 | `NEXT_PUBLIC_CLOUD_URL` | - | Cloud sync endpoint |
+
+
+---
+
+## Local-only Operation and Security
+
+This fork is intended for local use. Keep the dashboard bound to localhost unless Sếp explicitly decides to expose it. Before any non-local exposure:
+
+- Set a strong `INITIAL_PASSWORD`.
+- Set a stable `JWT_SECRET` and `API_KEY_SECRET`.
+- Set `REQUIRE_API_KEY=true` for `/v1/*`.
+- Protect `$DATA_DIR/db/data.sqlite` because it stores provider credentials, OAuth tokens, usage data, and settings.
 
 ---
 

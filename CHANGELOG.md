@@ -5,6 +5,7 @@
 
 ## Documentation
 - Add `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` to document fork-only features and post-upstream-merge verification steps.
+- Clean up documentation for local-only `diepxuan/9router` usage and keep only English/Vietnamese docs.
 
 ## Fixes
 - Combo fallback: immediately try the next model on timeout/transient upstream errors instead of sleeping before fallback.

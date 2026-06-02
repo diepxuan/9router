@@ -1,107 +1,74 @@
 # AGENTS.md - 9Router Workspace Protocol
 
-Quy trình làm việc cho workspace 9router.
-
 ---
 
 ## 1. Boot Sequence
 
-Mỗi session làm việc với 9router phải:
+Mỗi session phải:
 
 1. Đọc `SOUL.md` — xác nhận bản sắc
 2. Đọc `IDENTITY.md` — xác định vai trò
-3. Đọc `README.md` — hiểu dự án
-4. Đọc memory hôm nay & hôm qua
+3. Đọc `USER.md` — xác định Sếp
+4. Đọc memory hôm nay & hôm qua (`memory/YYYY-MM-DD.md`)
 5. Nếu MAIN SESSION: đọc `MEMORY.md` (root workspace)
 
 ---
 
-## 2. Cấu trúc workspace
+## 2. Memory Structure
 
-```
-/root/.openclaw/workspace/projects/9router/
-├── SOUL.md           # Bản sắc agent
-├── IDENTITY.md       # Định danh
-├── AGENTS.md         # Protocol này
-├── README.md         # Dự án docs
-├── CHANGELOG.md      # Lịch sử thay đổi
-├── package.json      # Dependencies
-├── src/              # Source code
-├── public/           # Static files
-├── docs/             # Update documentation
-├── scripts/          # Build/deploy scripts
-├── tests/            # Test files
-├── Dockerfile        # Docker config
-└── diepxuan.config.mjs # Custom config
-```
+| Loại | File | Mục đích |
+|------|------|----------|
+| Daily | `memory/YYYY-MM-DD.md` | Log thô theo ngày |
+| Long-term | root `MEMORY.md` | Thông tin chiến lược (chỉ MAIN SESSION) |
 
 ---
 
-## 3. Quy tắc phát triển
+## 3. Git Discipline
 
-### 3.1 Trước khi code
-
-- Đọc issue/task rõ ràng.
-- Xác định phạm vi ảnh hưởng.
-- Kiểm tra xem đã có code tương tự chưa.
-
-### 3.2 Trong khi code
-
-- Tuân thủ coding style hiện tại.
-- Không phá backward compatibility.
-- Test RTK compression kỹ — sai = tốn token.
-
-### 3.3 Sau khi code
-
-- Cập nhật CHANGELOG.md.
-- Tạo docs/UPDATE-YYYY-MM-DD.md nếu thay đổi lớn.
-- Commit với message rõ ràng.
+- Mỗi task = 1 branch = 1 PR
+- Không push trực tiếp lên main
+- **KHÔNG** tạo PR lên `decolua/9router` (upstream) — chỉ trên fork `diepxuan/9router`
+- Chờ Sếp review trước khi merge
 
 ---
 
-## 4. Git Discipline
+## 4. Development Rules
 
-- Branch naming: `feature/xxx`, `fix/xxx`, `docs/xxx`
-- Mỗi task = 1 branch = 1 PR.
-- Không push trực tiếp main.
-- Chờ Sếp review.
+### Trước khi code
 
-### 4.1 PR Policy — CẤM TẠO UPSTREAM PR
+- Đọc issue/task rõ ràng
+- Xác định phạm vi ảnh hưởng
+- Kiểm tra code tương tự đã có
 
-**Chỉ tạo PR trên fork `diepxuan/9router`.**
-**KHÔNG BAO GIỜ tạo PR trực tiếp lên upstream `decolua/9router`.**
+### Trong khi code
 
-Quy trình đúng:
-1. Code trên branch mới (từ `main` của fork)
-2. Commit + push lên fork `diepxuan/9router`
-3. Tạo PR trên fork: `diepxuan/9router#N` (base=`main`)
-4. Báo Sếp — Sếp tự merge vào fork
-5. Sếp tự quyết định có push lên upstream `decolua/9router/master` hay không
+- Tuân thủ coding style hiện tại
+- Không phá backward compatibility
+- RTK compression phải chính xác — sai = tốn token
 
-Lý do:
-- Upstream repo `decolua/9router` là nguồn public, cần kiểm soát chặt.
-- Sếp là người duy nhất quyết định khi nào code được đẩy lên upstream.
-- Tránh tạo PR rác hoặc PR chưa được review lên upstream.
+### Sau khi code
 
-Nếu agent lỡ tạo upstream PR → xóa ngay, báo Sếp.
+- Cập nhật CHANGELOG.md
+- Tạo `docs/UPDATE-YYYY-MM-DD.md` nếu thay đổi lớn
+- Commit message rõ ràng
 
 ---
 
-## 5. Testing
+## 5. Sub-Agents
 
-- Chạy tests trước khi commit.
-- Test proxy flow: request → router → provider → response.
-- Test RTK: verify token savings không mất context.
-- Test fallback: provider 1 fail → provider 2.
-
----
-
-## 6. Deployment
-
-- Docker build qua `Dockerfile`.
-- Deploy qua CapRover (`captain-definition`).
-- Config qua `diepxuan.config.mjs`.
+- Gọi là **đệ**
+- Mô tả rõ: mục tiêu, input, output, giới hạn quyền
+- Đệ không được vượt quyền agent 9router
 
 ---
 
-Protocol này áp dụng cho mọi session làm việc với 9router.
+## 6. Session Types
+
+| Loại | Key | Quyền |
+|------|-----|-------|
+| MAIN | `agent:9router:main` | Đọc/cập nhật MEMORY.md |
+| Normal | — | Chỉ ghi daily memory |
+
+---
+
+Không bỏ qua boot sequence. Không hành động khi chưa nắm đủ context.
