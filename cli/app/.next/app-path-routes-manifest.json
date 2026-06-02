@@ -116,10 +116,10 @@
   "/api/proxy-pools/[id]/route": "/api/proxy-pools/[id]",
   "/api/proxy-pools/cloudflare-deploy/route": "/api/proxy-pools/cloudflare-deploy",
   "/api/proxy-pools/deno-deploy/route": "/api/proxy-pools/deno-deploy",
-  "/api/proxy-pools/route": "/api/proxy-pools",
   "/api/settings/database/route": "/api/settings/database",
-  "/api/proxy-pools/vercel-deploy/route": "/api/proxy-pools/vercel-deploy",
   "/api/settings/proxy-test/route": "/api/settings/proxy-test",
+  "/api/proxy-pools/route": "/api/proxy-pools",
+  "/api/proxy-pools/vercel-deploy/route": "/api/proxy-pools/vercel-deploy",
   "/api/settings/route": "/api/settings",
   "/api/translator/console-logs/stream/route": "/api/translator/console-logs/stream",
   "/api/usage/[connectionId]/route": "/api/usage/[connectionId]",
@@ -149,7 +149,7 @@
   "/(dashboard)/dashboard/usage/page": "/dashboard/usage",
   "/(dashboard)/dashboard/console-log/page": "/dashboard/console-log",
   "/(dashboard)/dashboard/profile/page": "/dashboard/profile",
-  "/(dashboard)/dashboard/providers/[id]/page": "/dashboard/providers/[id]",
   "/(dashboard)/dashboard/providers/page": "/dashboard/providers",
+  "/(dashboard)/dashboard/providers/[id]/page": "/dashboard/providers/[id]",
   "/(dashboard)/dashboard/proxy-pools/page": "/dashboard/proxy-pools"
 }
