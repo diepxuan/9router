@@ -1,90 +1,66 @@
 # BOOTSTRAP.md - 9Router Session Initialization Protocol
 
-Quy trình khởi động bắt buộc cho mọi session làm việc với 9Router.
+> **Ghi nhớ:** Boot sequence chi tiết xem `AGENTS.md` §1. File này bổ sung rules vận hành.
 
 ---
 
-## 1. Mục tiêu
+## 1. Boot Sequence
 
-Đảm bảo:
-
-- Không mất context khi làm việc với 9Router.
-- Hiểu rõ kiến trúc proxy & RTK trước khi code.
-- Không phá vỡ backward compatibility.
-- Không push/merge khi chưa được Sếp cho phép.
+Xem `AGENTS.md` §1 — bắt buộc đọc SOUL.md → IDENTITY.md → USER.md → AGENTS.md → memory trước khi xử lý task.
 
 ---
 
-## 2. Startup Sequence (BẮT BUỘC)
+## 2. Context Validation Checklist
 
-Mỗi session phải thực hiện:
+Trước khi action, tự hỏi:
 
-1. Đọc `SOUL.md` — bản sắc & nguyên tắc agent 9router
-2. Đọc `IDENTITY.md` — định danh & vai trò
-3. Đọc `AGENTS.md` — workspace protocol
-4. Đọc `README.md` — tổng quan dự án
-5. Đọc memory:
-   - `memory/YYYY-MM-DD.md` (hôm nay)
-   - `memory/YYYY-MM-DD.md` (hôm qua)
-6. Nếu là MAIN SESSION:
-   - Đọc `MEMORY.md` (root workspace)
+| Câu hỏi | Ưu tiên |
+|---------|---------|
+| Task đã rõ scope chưa? | — |
+| Có ảnh hưởng RTK compression? | Cao nhất — sai = mất token |
+| Có ảnh hưởng proxy routing/fallback? | Test fallback trước khi merge |
+| Có thay đổi config/providers? | Kiểm tra backward compatibility |
+| Cần update docs (`docs/UPDATE-*.md`)? | Nếu có thay đổi đáng kể |
 
-Chỉ sau khi hoàn tất mới được xử lý task.
+Chưa rõ → hỏi Sếp, đừng đoán.
 
 ---
 
-## 3. Context Validation
+## 3. Execution Guard
 
-Trước khi hành động:
+Tuyệt đối không:
+- Bỏ qua boot sequence
+- Push/merge trực tiếp lên main
+- Tạo PR lên `decolua/9router` (upstream) — chỉ trên fork `diepxuan/9router`
+- Sửa PR cũ (tạo branch mới cho mọi thay đổi)
+- Phá backward compatibility
+- Commit secrets/API keys
 
-- Task đã rõ chưa?
-- Có ảnh hưởng RTK token saver không? → Ưu tiên cao nhất
-- Có ảnh hưởng proxy routing không? → Test fallback
-- Có thay đổi config/providers không? → Kiểm tra compatibility
-- Có cần update docs không?
-
-Nếu chưa rõ → hỏi Sếp.
-
----
-
-## 4. Execution Guard
-
-Không được:
-
-- Bỏ qua boot sequence.
-- Tự ý push lên main.
-- Tự ý tạo PR.
-- Sửa PR cũ.
-- Phá backward compatibility.
-- Commit secrets/API keys.
+Chi tiết git workflow: xem `AGENTS.md` §3.
 
 ---
 
-## 5. Documentation Trigger
+## 4. Documentation Trigger
 
-Phải tạo/cập nhật tài liệu khi:
-
-- Thêm provider mới.
-- Thay đổi RTK compression logic.
-- Sửa fallback routing.
-- Thay đổi dashboard UI đáng kể.
-- Fix bug ảnh hưởng proxy/token savings.
+Tạo/cập nhật tài liệu khi:
+- Thêm provider mới
+- Thay đổi RTK compression logic
+- Sửa fallback routing
+- Thay đổi dashboard UI đáng kể
+- Fix bug ảnh hưởng proxy/token savings
 
 File: `docs/UPDATE-YYYY-MM-DD.md`
+Changelog: `CHANGELOG.md`
 
 ---
 
-## 6. Failure Handling
+## 5. Failure Handling
 
-Nếu xảy ra lỗi:
-
-1. Dừng ngay.
-2. Phân tích nguyên nhân.
-3. Không patch trực tiếp main.
-4. Tạo branch mới để fix.
-5. Báo cáo Sếp rõ ràng.
+1. Dừng ngay
+2. Phân tích root cause
+3. Không patch trực tiếp main — tạo branch fix mới
+4. Báo cáo Sếp
 
 ---
 
-BOOTSTRAP.md là lớp bảo vệ cho dự án 9Router.
-Không được bỏ qua.
+BOOTSTRAP.md + AGENTS.md = bộ rules vận hành 9Router. Không bỏ qua.
