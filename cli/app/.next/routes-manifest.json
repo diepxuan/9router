@@ -170,6 +170,14 @@
       "namedRegex": "^/api/v1beta/models/(?<nxtPpath>.+?)(?:/)?$"
     },
     {
+      "page": "/dashboard/cli-tools/[toolId]",
+      "regex": "^/dashboard/cli\\-tools/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoolId": "nxtPtoolId"
+      },
+      "namedRegex": "^/dashboard/cli\\-tools/(?<nxtPtoolId>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/dashboard/media-providers/combo/[id]",
       "regex": "^/dashboard/media\\-providers/combo/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -337,6 +345,12 @@
       "namedRegex": "^/api/cli\\-tools/hermes\\-settings(?:/)?$"
     },
     {
+      "page": "/api/cli-tools/jcode-settings",
+      "regex": "^/api/cli\\-tools/jcode\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cli\\-tools/jcode\\-settings(?:/)?$"
+    },
+    {
       "page": "/api/cli-tools/kilo-settings",
       "regex": "^/api/cli\\-tools/kilo\\-settings(?:/)?$",
       "routeKeys": {},
@@ -353,30 +367,6 @@
       "regex": "^/api/cli\\-tools/opencode\\-settings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/cli\\-tools/opencode\\-settings(?:/)?$"
-    },
-    {
-      "page": "/api/cloud/auth",
-      "regex": "^/api/cloud/auth(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/cloud/auth(?:/)?$"
-    },
-    {
-      "page": "/api/cloud/credentials/update",
-      "regex": "^/api/cloud/credentials/update(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/cloud/credentials/update(?:/)?$"
-    },
-    {
-      "page": "/api/cloud/model/resolve",
-      "regex": "^/api/cloud/model/resolve(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/cloud/model/resolve(?:/)?$"
-    },
-    {
-      "page": "/api/cloud/models/alias",
-      "regex": "^/api/cloud/models/alias(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/cloud/models/alias(?:/)?$"
     },
     {
       "page": "/api/combos",
@@ -473,6 +463,12 @@
       "regex": "^/api/models/test(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/models/test(?:/)?$"
+    },
+    {
+      "page": "/api/oauth/codex/import-token",
+      "regex": "^/api/oauth/codex/import\\-token(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/oauth/codex/import\\-token(?:/)?$"
     },
     {
       "page": "/api/oauth/cursor/auto-import",
@@ -581,6 +577,18 @@
       "regex": "^/api/proxy\\-pools(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/proxy\\-pools(?:/)?$"
+    },
+    {
+      "page": "/api/proxy-pools/cloudflare-deploy",
+      "regex": "^/api/proxy\\-pools/cloudflare\\-deploy(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/proxy\\-pools/cloudflare\\-deploy(?:/)?$"
+    },
+    {
+      "page": "/api/proxy-pools/deno-deploy",
+      "regex": "^/api/proxy\\-pools/deno\\-deploy(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/proxy\\-pools/deno\\-deploy(?:/)?$"
     },
     {
       "page": "/api/proxy-pools/vercel-deploy",
@@ -701,18 +709,6 @@
       "regex": "^/api/tunnel/tailscale\\-install(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/tunnel/tailscale\\-install(?:/)?$"
-    },
-    {
-      "page": "/api/tunnel/tailscale-login",
-      "regex": "^/api/tunnel/tailscale\\-login(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/tunnel/tailscale\\-login(?:/)?$"
-    },
-    {
-      "page": "/api/tunnel/tailscale-start-daemon",
-      "regex": "^/api/tunnel/tailscale\\-start\\-daemon(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/tunnel/tailscale\\-start\\-daemon(?:/)?$"
     },
     {
       "page": "/api/usage/chart",
