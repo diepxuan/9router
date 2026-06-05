@@ -178,6 +178,7 @@ export async function handleComboChat({ body, models, handleSingleModel, log, co
       lastError = error.message || String(error);
       if (!lastStatus) lastStatus = 500;
       log.warn("COMBO", `Model ${modelStr} threw error, trying next`, { error: lastError });
+      recordComboModelResult(modelStr, comboName, false);
     }
   }
 
