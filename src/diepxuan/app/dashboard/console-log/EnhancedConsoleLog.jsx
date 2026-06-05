@@ -181,10 +181,10 @@ export default function EnhancedConsoleLog() {
 
     for (const line of logs) {
       // Start of new request
-      // Combo requests: [CHAT] Combo "name" with N models
-      // Single requests: [PENDING] START or POST /v1/... [CHAT]
+      // Combo: [CHAT] Combo "name" with N models
+      // Single: POST /v1/... (NOT [PENDING] START - that's same request)
       const isNewCombo = line.includes('[CHAT]') && line.includes('Combo "');
-      const isNewSingle = line.includes('[PENDING] START') || line.match(/POST \/v\d+\//);
+      const isNewSingle = line.match(/POST \/v\d+\//);
       
       if (isNewCombo || isNewSingle) {
         if (currentRequest) {
