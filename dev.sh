@@ -92,7 +92,7 @@ do_start() {
     if systemctl is-active --quiet "${SERVICE_NAME}.service"; then
         echo -e "\n${GREEN}✅ Development server is running!${NC}"
         echo -e "${YELLOW}🌐 Access: http://${HOSTNAME}:3000${NC}"
-        echo -e "${YELLOW}📝 Logs: journalctl -u ${SERVICE_NAME} -f${NC}"
+        echo -e "${YELLOW}📝 View logs: ./dev.sh logs${NC}"
     else
         echo -e "${RED}❌ Failed to start service. Check logs:${NC}"
         journalctl -u "${SERVICE_NAME}" --no-pager -n 10
@@ -115,6 +115,13 @@ do_stop() {
     echo -e "${GREEN}✅ Development environment stopped${NC}"
 }
 
+# Hàm logs (realtime)
+do_logs() {
+    echo -e "${YELLOW}📝 Following logs for ${SERVICE_NAME}... (Ctrl+C to exit)${NC}"
+    echo "================================"
+    journalctl -u "${SERVICE_NAME}" -f --no-pager
+}
+
 # Hàm status
 do_status() {
     echo -e "\n${YELLOW}📊 9Router Development Status${NC}"
@@ -133,7 +140,7 @@ do_status() {
     if systemctl is-active --quiet "${SERVICE_NAME}.service" 2>/dev/null; then
         echo -e "${GREEN}✓${NC} Service: ${SERVICE_NAME} (running)"
         echo -e "${YELLOW}📝 Recent logs:${NC}"
-        journalctl -u "${SERVICE_NAME}" --no-pager -n 5
+        journalctl -u "${SERVICE_NAME}" --no-pager -n 10
     elif systemctl is-enabled --quiet "${SERVICE_NAME}.service" 2>/dev/null; then
         echo -e "${YELLOW}⚠${NC} Service: ${SERVICE_NAME} (enabled but not running)"
     else
@@ -152,12 +159,22 @@ case "${1:-start}" in
     status)
         do_status
         ;;
+    logs)
+        do_logs
+        ;;
     restart)
         do_stop
         do_start
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|status|logs}"
+        echo ""
+        echo "Commands:"
+        echo "  start   - Start dev server (systemd + hosts)"
+        echo "  stop    - Stop dev server (cleanup)"
+        echo "  status  - Check service status"
+        echo "  logs    - Follow realtime logs"
+        echo "  restart - Stop then start"
         exit 1
         ;;
 esac
