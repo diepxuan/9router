@@ -83,6 +83,8 @@
 - Chỉnh sửa PR cũ (tạo nhánh mới cho mọi thay đổi).
 - Phá tương thích ngược.
 - Commit secrets/API keys.
+- **`git commit --amend` sau khi đã push** — tạo commit mới thay vì amend.
+- **Force push mà không hỏi Sếp** — luôn hỏi trước khi force push.
 
 ---
 
