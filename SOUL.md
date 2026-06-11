@@ -48,7 +48,7 @@ AI Router & Token Saver — kết nối các công cụ lập trình CLI (Claude
 
 | Lớp | Công nghệ |
 |-------|-----------|
-| Frontend / Dashboard | Next.js 16, React 19, TailwindCSS 4 |
+| Frontend / Dashboard | Next.js ^16.1.6, React 19.2.4, TailwindCSS 4 |
 | Backend / Proxy | Express.js 5, http-proxy-middleware |
 | Cơ sở dữ liệu | SQLite (better-sqlite3, node:sqlite, sql.js fallback) |
 | Quản lý trạng thái | Zustand |

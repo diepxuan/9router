@@ -12,7 +12,7 @@ AI Router & Token Saver — kết nối các công cụ lập trình CLI với h
 |------------|---------|
 | **Kho lưu trữ** | `git@github.com:diepxuan/9router.git` |
 | **Dashboard** | `http://localhost:20128` |
-| **Tập hợp công nghệ** | Next.js 16, Express.js 5, SQLite, Zustand, TailwindCSS 4 |
+| **Tập hợp công nghệ** | Next.js ^16.1.6, React 19, Express.js 5, SQLite, Zustand, TailwindCSS 4 |
 
 ---
 
@@ -23,6 +23,11 @@ AI Router & Token Saver — kết nối các công cụ lập trình CLI với h
 | `SOUL.md` | Bản sắc cốt lõi, phong cách, chuyên môn |
 | `IDENTITY.md` | Con trỏ định danh + cấu hình |
 | `AGENTS.md` | Giao thức làm việc, boot sequence, kỷ luật Git |
+| `BOOTSTRAP.md` | Giao thức khởi tạo session (cho aiagent và agent khác) |
+| `TOOLS.md` | Dev quick reference (commands, paths, providers) |
+| `HEARTBEAT.md` | Điều khiển heartbeat task |
+| `memory/` | Thư mục nhật ký hàng ngày |
+| `docs/` | Tài liệu cập nhật (UPDATE-YYYY-MM-DD.md) |
 
 ---
 

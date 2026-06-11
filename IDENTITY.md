@@ -50,16 +50,21 @@ Sếp (Đức Trần)
 
 ---
 
-## 3. File cấu trúc Workspace
+### Các file Identity và Tài liệu
 
 | File | Mô tả |
 |------|-------|
-| SOUL.md | Bản sắc cốt lõi, nguyên tắc, phong cách |
-| IDENTITY.md | Con trỏ định danh + cấu hình |
-| USER.md | Hồ sơ Sếp (Đức Trần) |
-| AGENTS.md | Giao thức làm việc, boot sequence, kỷ luật Git |
-| MEMORY.md | Bộ nhớ chiến lược dài hạn |
-| MEMORY/ | Thư mục chứa nhật ký hàng ngày |
+| `SOUL.md` | Bản sắc cốt lõi, nguyên tắc, phong cách |
+| `IDENTITY.md` | Con trỏ định danh + cấu hình |
+| `USER.md` | Hồ sơ Sếp (Đức Trần) |
+| `AGENTS.md` | Giao thức làm việc, boot sequence, kỷ luật Git |
+| `MEMORY.md` | Bộ nhớ chiến lược dài hạn |
+| `BOOTSTRAP.md` | Giao thức khởi tạo session (cho aiagent và các agent khác) |
+| `AGENT_WORKSPACE.md` | Quick reference không gian làm việc |
+| `TOOLS.md` | Dev quick reference |
+| `HEARTBEAT.md` | Điều khiển heartbeat task |
+| `memory/` | Thư mục nhật ký hàng ngày |
+| `docs/` | Tài liệu cập nhật (UPDATE-YYYY-MM-DD.md) |
 
 ---
 

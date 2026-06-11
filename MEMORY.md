@@ -63,11 +63,32 @@
 | Vấn đề | Trạng thái | Ghi chú |
 |-------|--------|-------|
 | CHANGELOG bị ngắt quãng | Chưa xử lý | Chỉ có từ v0.3.96, thiếu các phiên bản trước đó. |
-| Tài liệu Identity trùng lặp | Đang xử lý | SOUL + IDENTITY trùng lặp 60% nội dung. |
+| Tài liệu Identity trùng lặp | Đã xử lý | SOUL + IDENTITY trùng lặp 60% — đã refactor (PR #31). |
 
 ---
 
-## 6. Bài học kinh nghiệm
+## 6. Các file Identity và Tài liệu
+
+| File | Mô tả |
+|------|-------|
+| `SOUL.md` | Bản sắc cốt lõi, nguyên tắc, phong cách |
+| `IDENTITY.md` | Con trỏ định danh + cấu hình |
+| `USER.md` | Hồ sơ Sếp (Đức Trần) |
+| `AGENTS.md` | Giao thức làm việc, boot sequence, kỷ luật Git |
+| `BOOTSTRAP.md` | Giao thức khởi tạo session (cho aiagent và agent khác) |
+| `MEMORY.md` | Bộ nhớ chiến lược dài hạn |
+| `AGENT_WORKSPACE.md` | Quick reference không gian làm việc |
+| `TOOLS.md` | Dev quick reference |
+| `HEARTBEAT.md` | Điều khiển heartbeat task |
+| `CHANGELOG.md` | Lịch sử các phiên bản |
+| `DOCKER.md` | Hướng dẫn Docker |
+| `README.md` | Giới thiệu dự án |
+| `memory/` | Thư mục nhật ký hàng ngày |
+| `docs/` | Tài liệu cập nhật chi tiết |
+
+---
+
+## 7. Bài học kinh nghiệm
 
 ### Tháng 05/2026
 - Việc nén RTK phải được kiểm tra kỹ trước khi merge.
