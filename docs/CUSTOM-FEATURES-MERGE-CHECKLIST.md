@@ -6,6 +6,19 @@ Mục tiêu:
 - Dùng làm danh sách đối chiếu sau mỗi lần merge/rebase với upstream.
 - Tránh mất tính năng custom khi resolve conflict.
 - Có checklist kiểm tra nhanh trước khi push/PR.
+- Có manifest và script tự động để kiểm tra các patch fork còn hoạt động.
+
+Công cụ kiểm tra tự động:
+- Manifest máy đọc được: `docs/custom-features.manifest.json`
+- Script kiểm tra: `scripts/diepxuan/check-custom-features.mjs`
+- Lệnh chuẩn sau mỗi lần merge/rebase upstream:
+
+```bash
+node scripts/diepxuan/check-custom-features.mjs
+npm run build
+```
+
+Nếu script báo `FAIL`, không push/PR cho tới khi đã phân tích và sửa nguyên nhân. Nếu cần cập nhật feature mới hoặc đổi vị trí file custom, cập nhật cả tài liệu này và `docs/custom-features.manifest.json`.
 
 Repository:
 - Fork: `diepxuan/9router`
@@ -38,8 +51,9 @@ Provider IDs:
 - `src/app/api/providers/[id]/test/testUtils.js`
 - `src/app/api/providers/[id]/models/route.js`
 - `open-sse/services/usage.js`
-- `cli/app/public/providers/alicode.png`
-- `cli/app/public/providers/alicode-intl.png`
+- `open-sse/diepxuan/services/usage.js`
+- `public/providers/alicode.png`
+- `public/providers/alicode-intl.png`
 
 ### Điểm đối chiếu code
 
@@ -62,7 +76,7 @@ Trong provider validate/test phải xử lý `alicode` và `alicode-intl` như O
 ### Checklist sau merge upstream
 
 ```bash
-grep -R "alicode" -n src/shared/constants src/app/api/providers open-sse/services cli/app/public/providers | head -80
+grep -R "alicode" -n src/shared/constants src/app/api/providers open-sse/services open-sse/diepxuan public/providers | head -80
 node --check src/shared/constants/providers.js
 node --check src/shared/constants/config.js
 node --check src/app/api/providers/validate/route.js
@@ -416,7 +430,30 @@ node --check src/mitm/handlers/base.js
 
 ### Mục đích
 
-Fork có workflow build/deploy riêng để build app và cập nhật package/artifact theo branch fork.
+Fork có workflow build/deploy riêng để build CLI package, đổi package identity sang scope nội bộ và publish lên GitHub Packages của fork.
+
+Workflow chính:
+- File: `.github/workflows/build-and-deploy.yml`
+- Trigger: push lên `main` và `workflow_dispatch`
+- Quyền GitHub Actions cần giữ:
+  - `contents: write`
+  - `packages: write`
+- Registry publish: `https://npm.pkg.github.com`
+- Package publish: `@diepxuan/9router`
+- Auth publish: `${{ secrets.GITHUB_TOKEN }}` qua `NODE_AUTH_TOKEN`
+
+Các bước custom trong workflow cần giữ:
+1. Checkout với `fetch-depth: 0` và `ref: ${{ github.head_ref || github.ref_name }}`.
+2. Setup Node.js với `registry-url: "https://npm.pkg.github.com"`.
+3. Trong thư mục `cli`, patch package trước build:
+   - `npm pkg set name="@diepxuan/9router"`
+   - `npm pkg set publishConfig.registry="https://npm.pkg.github.com/"`
+   - `npm pkg delete scripts.prepublishOnly || true`
+4. Chạy `npm run build` trong `cli`.
+5. Bump version không tạo git tag:
+   - `npm version patch --no-git-tag-version`
+   - `npm version prerelease --preid=patch.$TIMESTAMP --no-git-tag-version`
+6. Publish bằng `npm publish`.
 
 Files:
 - `.github/workflows/build-and-deploy.yml`
@@ -426,19 +463,39 @@ Files:
 - `.npmignore`
 - `next.config.mjs`
 
+`scripts/sync.sh` hiện sync dữ liệu runtime từ host `9router` về `/var/lib/9router/`:
+
+```bash
+rsync -avP --delete 9router:~/.9router/ /var/lib/9router/
+```
+
 ### Checklist sau merge upstream
 
 ```bash
+node scripts/diepxuan/check-custom-features.mjs
 test -f .github/workflows/build-and-deploy.yml && echo "workflow OK"
+grep -n "@diepxuan/9router\|npm.pkg.github.com\|npm publish\|prepublishOnly\|NODE_AUTH_TOKEN" .github/workflows/build-and-deploy.yml
 test -f Dockerfile && echo "Dockerfile OK"
 test -f captain-definition && echo "captain-definition OK"
 test -f scripts/sync.sh && echo "sync.sh OK"
+grep -n "rsync -avP --delete 9router:~/.9router/ /var/lib/9router/" scripts/sync.sh
 npm run build
 ```
+
+### Dấu hiệu workflow bị merge hỏng
+
+- Package name không còn là `@diepxuan/9router` trước khi publish.
+- Registry không còn là `https://npm.pkg.github.com/`.
+- Workflow không xóa `scripts.prepublishOnly`, làm publish bị chặn bởi script upstream.
+- Version bump tạo git tag hoặc sửa git history ngoài ý muốn.
+- `npm publish` chạy ở root thay vì trong `cli`.
+- Thiếu `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.
+- Workflow trigger/push nhầm upstream hoặc branch không phải fork `main`.
 
 ### Lưu ý
 
 - Không tự ý push/trigger deploy production nếu Sếp chưa duyệt.
+- Workflow này chạy khi push lên `main`; mọi PR cần review kỹ trước merge vì merge có thể kích hoạt publish package.
 
 ### Domain separation rule
 
@@ -489,37 +546,33 @@ Chạy từ root repo:
 git status --short --branch
 git log --oneline --decorate --max-count=10
 
-# 2. Kiểm tra custom keywords còn tồn tại
-grep -R "alicode\|alicode-intl\|manualQuota\|hasManualQuota\|getManualQuota" -n src open-sse cli | head -120
+# 2. Chạy bộ kiểm tra custom feature tự động
+node scripts/diepxuan/check-custom-features.mjs
+
+# 3. Kiểm tra nhanh custom keywords còn tồn tại
+grep -R "alicode\|alicode-intl\|manualQuota\|hasManualQuota\|getManualQuota" -n src open-sse cli docs .github scripts | head -120
 grep -R "firstCombo\|No provider/model specified\|Unknown provider" -n src/sse/handlers/search.js src/sse/handlers/fetch.js
 
-# 3. Syntax check file custom chính
-node --check src/lib/db/repos/manualQuotaRepo.js
+# 4. Syntax check file custom chính
+node --check src/diepxuan/lib/db/repos/manualQuotaRepo.js
 node --check src/app/api/usage/[connectionId]/route.js
 node --check src/sse/handlers/search.js
 node --check src/sse/handlers/fetch.js
-node --check src/shared/constants/providers.js
-node --check src/shared/constants/config.js
-node --check src/app/api/providers/validate/route.js
-node --check src/app/api/providers/[id]/test/testUtils.js
-node --check src/app/api/providers/[id]/models/route.js
+node --check scripts/diepxuan/check-custom-features.mjs
 
-# 4. Build production
+# 5. Build production
 npm run build
 
-# 5. Kiểm tra working tree không có artifact ngoài ý muốn
+# 6. Kiểm tra working tree không có artifact ngoài ý muốn
 git status --short --branch
 ```
 
 Kết quả tối thiểu phải đạt:
+- `node scripts/diepxuan/check-custom-features.mjs` pass, không có `FAIL`.
 - `node --check` pass hết.
 - `npm run build` pass.
 - Các keyword custom còn tồn tại.
-- Không có conflict marker:
-
-```bash
-grep -R "<<<<<<<\|=======\|>>>>>>>" -n src open-sse cli docs --exclude-dir=node_modules --exclude-dir=.next
-```
+- Không có conflict marker. Script tự kiểm tra conflict marker theo đầu dòng `<<<<<<<`, `=======`, `>>>>>>>` để tránh false positive với comment separator hoặc command grep trong tài liệu.
 
 ---
 
