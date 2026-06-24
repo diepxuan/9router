@@ -283,18 +283,23 @@
         "src/diepxuan/usage/providers.js",
         "src/diepxuan/sse/webComboFallback.js",
         "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/services/usageHooks.js"
+        "open-sse/diepxuan/services/usageHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js"
       ],
       "requiredPatterns": [
         { "file": "src/diepxuan/shared/config/flags.js", "pattern": "DIEPXUAN_ENABLED" },
         { "file": "src/diepxuan/shared/config/flags.js", "pattern": "DIEPXUAN_SAFE_MODE" },
         { "file": "src/diepxuan/shared/config/flags.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "src/diepxuan/shared/config/flags.js", "pattern": "parseBool\\(process\\.env\\.DIEPXUAN_ENABLED, true\\)" },
         { "file": "src/diepxuan/shared/config/flags.js", "pattern": "isDiepXuanSafeMode" },
         { "file": "src/diepxuan/usage/index.js", "pattern": "isDiepXuanEnabled" },
         { "file": "src/diepxuan/usage/providers.js", "pattern": "isDiepXuanEnabled" },
         { "file": "src/diepxuan/sse/webComboFallback.js", "pattern": "isDiepXuanEnabled" },
         { "file": "open-sse/diepxuan/comboHooks.js", "pattern": "isDiepXuanEnabled" },
-        { "file": "open-sse/diepxuan/services/usageHooks.js", "pattern": "isDiepXuanEnabled" }
+        { "file": "open-sse/diepxuan/services/usageHooks.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "tests/unit/diepxuan-feature-flags.test.js", "pattern": "enables DiepXuan hooks by default" },
+        { "file": "tests/unit/diepxuan-feature-flags.test.js", "pattern": "returns manual quota for providers handled by DiepXuan" },
+        { "file": "tests/unit/diepxuan-feature-flags.test.js", "pattern": "skips a combo model after repeated failures" }
       ],
       "syntaxCheck": [
         "src/diepxuan/shared/config/flags.js",
@@ -302,7 +307,8 @@
         "src/diepxuan/usage/providers.js",
         "src/diepxuan/sse/webComboFallback.js",
         "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/services/usageHooks.js"
+        "open-sse/diepxuan/services/usageHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js"
       ]
     }
   ]
