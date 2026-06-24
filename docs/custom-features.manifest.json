@@ -273,6 +273,37 @@
         { "file": "IDENTITY.md", "pattern": "diepxuan/9router" },
         { "file": "docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md", "pattern": "Custom Features Merge Checklist" }
       ]
+    },
+    {
+      "id": "diepxuan-feature-flags",
+      "description": "Runtime feature flags DIEPXUAN_ENABLED/DIEPXUAN_SAFE_MODE gate the entire DiepXuan extension layer.",
+      "requiredFiles": [
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/usage/index.js",
+        "src/diepxuan/usage/providers.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/services/usageHooks.js"
+      ],
+      "requiredPatterns": [
+        { "file": "src/diepxuan/shared/config/flags.js", "pattern": "DIEPXUAN_ENABLED" },
+        { "file": "src/diepxuan/shared/config/flags.js", "pattern": "DIEPXUAN_SAFE_MODE" },
+        { "file": "src/diepxuan/shared/config/flags.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "src/diepxuan/shared/config/flags.js", "pattern": "isDiepXuanSafeMode" },
+        { "file": "src/diepxuan/usage/index.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "src/diepxuan/usage/providers.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "src/diepxuan/sse/webComboFallback.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "open-sse/diepxuan/comboHooks.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "open-sse/diepxuan/services/usageHooks.js", "pattern": "isDiepXuanEnabled" }
+      ],
+      "syntaxCheck": [
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/usage/index.js",
+        "src/diepxuan/usage/providers.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/services/usageHooks.js"
+      ]
     }
   ]
 }

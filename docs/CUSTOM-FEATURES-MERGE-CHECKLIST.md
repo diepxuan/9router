@@ -703,6 +703,58 @@ Smoke test theo feature:
 
 ---
 
+## 12. Runtime feature flag cho DiepXuan extension layer
+
+### Mục đích
+
+Toàn bộ hook DiepXuan (Alibaba manual quota, open-sse AliCode usage, combo fail tracker, web fallback, ...) phải đi qua 2 flag runtime để dễ dàng tắt/bật khi debug, smoke test hoặc rebase upstream.
+
+Files:
+- `src/diepxuan/shared/config/flags.js`
+- `src/diepxuan/usage/index.js`
+- `src/diepxuan/usage/providers.js`
+- `src/diepxuan/sse/webComboFallback.js`
+- `open-sse/diepxuan/comboHooks.js`
+- `open-sse/diepxuan/services/usageHooks.js`
+
+### Flag
+
+- `DIEPXUAN_ENABLED` (mặc định `true`)
+  - `false`: tất cả hook DiepXuan trả về giá trị “no-op” (`null`/`false`), giữ nguyên hành vi upstream.
+- `DIEPXUAN_SAFE_MODE` (mặc định `false`)
+  - `true`: dành cho các hook ghi/đo lường, tắt ghi DB và override usage; chỉ giữ phần đọc an toàn.
+  - Hiện dùng cho `isDiepXuanUsageHookSafe()` nếu sau này mở rộng.
+
+### Helper quan trọng
+
+```js
+isDiepXuanEnabled()
+isDiepXuanSafeMode()
+```
+
+### Checklist sau merge upstream
+
+```bash
+grep -n "isDiepXuanEnabled\|DIEPXUAN_ENABLED" src/diepxuan/shared/config/flags.js src/diepxuan/usage src/diepxuan/sse open-sse/diepxuan
+node --check src/diepxuan/shared/config/flags.js
+node --check src/diepxuan/usage/index.js
+node --check src/diepxuan/usage/providers.js
+node --check src/diepxuan/sse/webComboFallback.js
+node --check open-sse/diepxuan/comboHooks.js
+node --check open-sse/diepxuan/services/usageHooks.js
+```
+
+### Smoke test
+
+1. Bật mặc định (`DIEPXUAN_ENABLED=true`):
+   - request search/fetch không provider → fallback combo.
+   - request usage cho AliCode → trả manual quota.
+2. Tắt bằng `DIEPXUAN_ENABLED=false`:
+   - request search/fetch → trả lỗi thiếu provider/model như upstream.
+   - request usage cho AliCode → fallback upstream API.
+
+---
+
 ## 13. Ghi chú lần kiểm tra gần nhất
 
 Lần kiểm tra gần nhất trong workspace:
