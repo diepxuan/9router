@@ -126,10 +126,14 @@ Provider đang dùng manual quota:
 
 ### File cần tồn tại/được giữ
 
-- `src/lib/db/repos/manualQuotaRepo.js`
-- `src/app/api/usage/[connectionId]/route.js`
-- `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.js`
-- `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/ProviderLimitCard.js`
+- `src/diepxuan/lib/db/repos/manualQuotaRepo.js` — implementation local counter
+- `src/diepxuan/usage/index.js` — server-side usage override hook
+- `src/diepxuan/usage/providers.js` — client-safe usage provider eligibility hook
+- `src/app/api/usage/[connectionId]/route.js` — base route hook `getUsageOverride(...)`
+- `src/app/api/providers/client/route.js` — base route hook `isDiepXuanUsageEligible(...)`
+- `src/diepxuan/app/dashboard/usage/components/ProviderLimits/index.js` — dashboard hook `extendUsageSupportedProviders(...)`
+- `src/diepxuan/app/dashboard/usage/components/ProviderLimits/utils.js`
+- `src/diepxuan/app/dashboard/usage/components/ProviderLimits/ProviderLimitCard.js`
 
 ### Logic quan trọng
 
@@ -152,13 +156,28 @@ const MANUAL_QUOTA_HANDLERS = {
 };
 ```
 
-`src/app/api/usage/[connectionId]/route.js` phải ưu tiên manual quota trước OAuth/API quota flow:
+`src/diepxuan/usage/index.js` và `src/diepxuan/usage/providers.js` phải là registry/hook trung tâm cho usage custom:
 
 ```js
-if (hasManualQuota(connection.provider)) {
-  const manualQuota = await getManualQuota(connection.provider, connectionId, connection);
-  return Response.json(manualQuota);
+extendUsageSupportedProviders()
+extendUsageApiKeyProviders()
+isDiepXuanUsageEligible()
+getUsageOverride()
+```
+
+`src/app/api/usage/[connectionId]/route.js` phải ưu tiên hook custom trước OAuth/API quota flow:
+
+```js
+const usageOverride = await getUsageOverride(connection, connectionId);
+if (usageOverride) {
+  return Response.json(usageOverride);
 }
+```
+
+`src/app/api/providers/client/route.js` không merge trực tiếp `DIEPXUAN_USAGE_*`; phải gọi hook:
+
+```js
+isDiepXuanUsageEligible(connection, USAGE_SUPPORTED_PROVIDERS, USAGE_APIKEY_PROVIDERS)
 ```
 
 ### Plan quota hiện tại
@@ -198,10 +217,13 @@ Manual quota là local counter:
 Sau merge upstream cần kiểm tra:
 
 ```bash
-grep -R "manualQuota" -n src/lib src/app | head -80
-grep -R "hasManualQuota\|getManualQuota" -n src/app/api/usage src/lib/db/repos
-node --check src/lib/db/repos/manualQuotaRepo.js
+grep -R "manualQuota" -n src/diepxuan src/app | head -80
+grep -R "getUsageOverride\|extendUsageSupportedProviders\|isDiepXuanUsageEligible" -n src/diepxuan/usage src/app/api/usage src/app/api/providers/client src/diepxuan/app/dashboard/usage/components/ProviderLimits
+node --check src/diepxuan/lib/db/repos/manualQuotaRepo.js
+node --check src/diepxuan/usage/index.js
+node --check src/diepxuan/usage/providers.js
 node --check src/app/api/usage/[connectionId]/route.js
+node --check src/app/api/providers/client/route.js
 ```
 
 ### Smoke test khuyến nghị
@@ -568,7 +590,7 @@ git log --oneline --decorate --max-count=10
 node scripts/diepxuan/check-custom-features.mjs
 
 # 3. Kiểm tra nhanh custom keywords còn tồn tại
-grep -R "alicode\|alicode-intl\|manualQuota\|hasManualQuota\|getManualQuota" -n src open-sse cli docs .github scripts | head -120
+grep -R "alicode\|alicode-intl\|manualQuota\|getUsageOverride\|isDiepXuanUsageEligible" -n src open-sse cli docs .github scripts | head -120
 grep -R "firstCombo\|No provider/model specified\|Unknown provider" -n src/sse/handlers/search.js src/sse/handlers/fetch.js
 
 # 4. Syntax check file custom chính
@@ -623,8 +645,8 @@ Smoke test theo feature:
 
 ## 12. Các dấu hiệu merge hỏng cần xử lý ngay
 
-- `alicode` mất khỏi `src/shared/constants/providers.js` hoặc `config.js`.
-- `/api/usage/[connectionId]` không còn gọi `hasManualQuota()` trước OAuth/API usage flow.
+- `src/shared/constants/providers.js` mất hook `extendApiKeyProviders(...)` hoặc `src/shared/constants/config.js` mất hook `extendProviderEndpoints(...)`.
+- `/api/usage/[connectionId]` không còn gọi `getUsageOverride()` trước OAuth/API usage flow.
 - `manualQuotaRepo.js` mất registry `alicode` / `alicode-intl`.
 - `search.js` / `fetch.js` mất fallback `firstCombo`.
 - `npm run build` fail tại route usage/search/fetch/provider.

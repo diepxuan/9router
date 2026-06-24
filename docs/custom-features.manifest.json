@@ -55,9 +55,12 @@
       "description": "Local manual quota counter for providers without quota APIs, currently AliCode.",
       "requiredFiles": [
         "src/diepxuan/lib/db/repos/manualQuotaRepo.js",
+        "src/diepxuan/usage/index.js",
+        "src/diepxuan/usage/providers.js",
         "src/app/api/usage/[connectionId]/route.js",
         "src/diepxuan/app/dashboard/usage/components/ProviderLimits/utils.js",
         "src/diepxuan/app/dashboard/usage/components/ProviderLimits/ProviderLimitCard.js",
+        "src/diepxuan/app/dashboard/usage/components/ProviderLimits/index.js",
         "src/app/api/providers/client/route.js"
       ],
       "requiredPatterns": [
@@ -65,15 +68,20 @@
         { "file": "src/diepxuan/lib/db/repos/manualQuotaRepo.js", "pattern": "MANUAL_QUOTA_HANDLERS" },
         { "file": "src/diepxuan/lib/db/repos/manualQuotaRepo.js", "pattern": "alicode" },
         { "file": "src/diepxuan/lib/db/repos/manualQuotaRepo.js", "pattern": "alicode-intl" },
-        { "file": "src/app/api/usage/[connectionId]/route.js", "pattern": "hasManualQuota" },
-        { "file": "src/app/api/usage/[connectionId]/route.js", "pattern": "getManualQuota" },
-        { "file": "src/app/api/providers/client/route.js", "pattern": "DIEPXUAN_USAGE_SUPPORTED_PROVIDERS" },
-        { "file": "src/app/api/providers/client/route.js", "pattern": "DIEPXUAN_USAGE_APIKEY_PROVIDERS" }
+        { "file": "src/diepxuan/usage/index.js", "pattern": "getUsageOverride" },
+        { "file": "src/diepxuan/usage/providers.js", "pattern": "extendUsageSupportedProviders" },
+        { "file": "src/diepxuan/usage/providers.js", "pattern": "isDiepXuanUsageEligible" },
+        { "file": "src/app/api/usage/[connectionId]/route.js", "pattern": "getUsageOverride" },
+        { "file": "src/app/api/providers/client/route.js", "pattern": "isDiepXuanUsageEligible" },
+        { "file": "src/diepxuan/app/dashboard/usage/components/ProviderLimits/index.js", "pattern": "extendUsageSupportedProviders" }
       ],
       "syntaxCheck": [
         "src/diepxuan/lib/db/repos/manualQuotaRepo.js",
+        "src/diepxuan/usage/index.js",
+        "src/diepxuan/usage/providers.js",
         "src/app/api/usage/[connectionId]/route.js",
-        "src/app/api/providers/client/route.js"
+        "src/app/api/providers/client/route.js",
+        "src/diepxuan/app/dashboard/usage/components/ProviderLimits/index.js"
       ]
     },
     {
