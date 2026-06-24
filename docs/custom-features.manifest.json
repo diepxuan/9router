@@ -20,9 +20,11 @@
         "src/app/api/providers/validate/route.js",
         "src/app/api/providers/[id]/test/testUtils.js",
         "src/app/api/providers/[id]/models/route.js",
+        "open-sse/services/usage.js",
         "open-sse/config/providers.js",
         "open-sse/config/providerModels.js",
         "open-sse/diepxuan/services/usage.js",
+        "open-sse/diepxuan/services/usageHooks.js",
         "public/providers/alicode.png",
         "public/providers/alicode-intl.png"
       ],
@@ -36,6 +38,8 @@
         { "file": "src/diepxuan/shared/constants/config.js", "pattern": "https://coding-intl\\.dashscope\\.aliyuncs\\.com/v1/chat/completions" },
         { "file": "src/app/api/providers/[id]/test/testUtils.js", "pattern": "case \\\"alicode\\\"|case \\\"alicode-intl\\\"" },
         { "file": "src/app/api/providers/[id]/models/route.js", "pattern": "alicode" },
+        { "file": "open-sse/services/usage.js", "pattern": "getDiepXuanUsageForProvider" },
+        { "file": "open-sse/diepxuan/services/usageHooks.js", "pattern": "getDiepXuanUsageForProvider" },
         { "file": "open-sse/config/providers.js", "pattern": "alicode" },
         { "file": "open-sse/config/providerModels.js", "pattern": "qwen3\\.5-plus" }
       ],
@@ -47,7 +51,30 @@
         "src/app/api/providers/validate/route.js",
         "src/app/api/providers/[id]/test/testUtils.js",
         "src/app/api/providers/[id]/models/route.js",
+        "open-sse/services/usage.js",
+        "open-sse/diepxuan/services/usageHooks.js",
         "open-sse/diepxuan/services/usage.js"
+      ]
+    },
+    {
+      "id": "combo-fail-tracker",
+      "description": "Combo fallback skips models after repeated failures through a DiepXuan hook layer.",
+      "requiredFiles": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js"
+      ],
+      "requiredPatterns": [
+        { "file": "open-sse/services/combo.js", "pattern": "shouldSkipComboModel" },
+        { "file": "open-sse/services/combo.js", "pattern": "recordComboModelOutcome" },
+        { "file": "open-sse/diepxuan/comboHooks.js", "pattern": "shouldSkipComboModel" },
+        { "file": "open-sse/diepxuan/comboHooks.js", "pattern": "recordComboModelOutcome" },
+        { "file": "open-sse/diepxuan/comboFailTracker.js", "pattern": "MAX_FAILS" }
+      ],
+      "syntaxCheck": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js"
       ]
     },
     {

@@ -52,8 +52,9 @@ Provider IDs:
 - `src/app/api/providers/validate/route.js`
 - `src/app/api/providers/[id]/test/testUtils.js`
 - `src/app/api/providers/[id]/models/route.js`
-- `open-sse/services/usage.js`
-- `open-sse/diepxuan/services/usage.js`
+- `open-sse/services/usage.js` — base hook `getDiepXuanUsageForProvider(...)`
+- `open-sse/diepxuan/services/usage.js` — AliCode usage implementation
+- `open-sse/diepxuan/services/usageHooks.js` — Open SSE usage hook registry
 - `public/providers/alicode.png`
 - `public/providers/alicode-intl.png`
 
@@ -86,6 +87,14 @@ alicode: "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
 "alicode-intl": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions"
 ```
 
+Trong `open-sse/services/usage.js` base không được gọi trực tiếp `getAlicodeUsage(...)`; phải gọi hook:
+
+```js
+getDiepXuanUsageForProvider(connection, proxyOptions)
+```
+
+Trong `open-sse/diepxuan/services/usageHooks.js` phải route `alicode` / `alicode-intl` sang `getAlicodeUsage(...)`.
+
 Trong provider validate/test phải xử lý `alicode` và `alicode-intl` như OpenAI-compatible provider.
 
 ### Checklist sau merge upstream
@@ -100,6 +109,9 @@ node --check src/diepxuan/shared/constants/config.js
 node --check src/app/api/providers/validate/route.js
 node --check src/app/api/providers/[id]/test/testUtils.js
 node --check src/app/api/providers/[id]/models/route.js
+node --check open-sse/services/usage.js
+node --check open-sse/diepxuan/services/usage.js
+node --check open-sse/diepxuan/services/usageHooks.js
 ```
 
 ### Smoke test khuyến nghị
@@ -346,9 +358,47 @@ Kết quả mong đợi:
 - Nếu có combo phù hợp: request được route qua combo.
 - Nếu không có combo: trả lỗi rõ ràng, không crash.
 
+### Smoke test khuyến nghị
+
+1. Có ít nhất một combo khả dụng.
+2. Gọi search/fetch không truyền provider/model.
+3. Kiểm tra request không fail ngay với lỗi thiếu provider/model nếu có combo phù hợp.
+
 ---
 
-## 5. Dynamic baseUrl trong combo curl snippet
+## 5. Combo fail tracker qua DiepXuan hook
+
+### Mục đích
+
+Combo fallback có thể bỏ qua model đã lỗi liên tiếp để giảm latency và tránh lặp lại provider/model đang hỏng. Base `open-sse/services/combo.js` chỉ giữ hook mỏng; state và logic custom nằm trong `open-sse/diepxuan/**`.
+
+### File cần tồn tại/được giữ
+
+- `open-sse/services/combo.js` — base hook `shouldSkipComboModel(...)` / `recordComboModelOutcome(...)`
+- `open-sse/diepxuan/comboHooks.js` — hook registry mỏng
+- `open-sse/diepxuan/comboFailTracker.js` — fail counter implementation
+
+### Điểm đối chiếu code
+
+```js
+shouldSkipComboModel(modelStr, comboName)
+recordComboModelOutcome(modelStr, comboName, success)
+```
+
+`open-sse/diepxuan/comboFailTracker.js` phải giữ threshold `MAX_FAILS` và reset window `RESET_AFTER_MS`.
+
+### Checklist sau merge upstream
+
+```bash
+grep -R "shouldSkipComboModel\|recordComboModelOutcome" -n open-sse/services/combo.js open-sse/diepxuan
+node --check open-sse/services/combo.js
+node --check open-sse/diepxuan/comboHooks.js
+node --check open-sse/diepxuan/comboFailTracker.js
+```
+
+---
+
+## 6. Dynamic baseUrl trong combo curl snippet
 
 ### Mục đích
 
