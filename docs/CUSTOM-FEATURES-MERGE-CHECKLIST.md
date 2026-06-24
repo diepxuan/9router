@@ -306,6 +306,7 @@ Nếu request search/fetch không truyền provider/model hoặc truyền provid
 Files:
 - `src/sse/handlers/search.js`
 - `src/sse/handlers/fetch.js`
+- `src/diepxuan/sse/webComboFallback.js`
 
 ### Logic cần giữ
 
@@ -322,16 +323,18 @@ Các helper quan trọng:
 
 ```js
 getCombos()
-getComboModelsFromData()
+getFallbackWebCombo()
+getFirstWebCombo()
 handleComboChat()
 ```
 
 ### Checklist sau merge upstream
 
 ```bash
-grep -n "firstCombo\|No provider/model specified\|Unknown provider" src/sse/handlers/search.js src/sse/handlers/fetch.js
+grep -n "firstCombo\|No provider/model specified\|Unknown provider\|getFallbackWebCombo" src/sse/handlers/search.js src/sse/handlers/fetch.js src/diepxuan/sse/webComboFallback.js
 node --check src/sse/handlers/search.js
 node --check src/sse/handlers/fetch.js
+node --check src/diepxuan/sse/webComboFallback.js
 ```
 
 ### Smoke test khuyến nghị
@@ -357,12 +360,6 @@ curl -sS http://localhost:20128/api/v1/search \
 Kết quả mong đợi:
 - Nếu có combo phù hợp: request được route qua combo.
 - Nếu không có combo: trả lỗi rõ ràng, không crash.
-
-### Smoke test khuyến nghị
-
-1. Có ít nhất một combo khả dụng.
-2. Gọi search/fetch không truyền provider/model.
-3. Kiểm tra request không fail ngay với lỗi thiếu provider/model nếu có combo phù hợp.
 
 ---
 

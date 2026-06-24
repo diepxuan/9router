@@ -133,23 +133,29 @@
       "description": "Web search/fetch fallback behavior for missing or unknown provider/model inputs.",
       "requiredFiles": [
         "src/sse/handlers/search.js",
-        "src/sse/handlers/fetch.js"
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
       ],
       "requiredPatterns": [
         { "file": "src/sse/handlers/search.js", "pattern": "getCombos" },
-        { "file": "src/sse/handlers/search.js", "pattern": "getComboModelsFromData" },
+        { "file": "src/sse/handlers/search.js", "pattern": "getFallbackWebCombo" },
+        { "file": "src/sse/handlers/search.js", "pattern": "firstCombo" },
+        { "file": "src/sse/handlers/search.js", "pattern": "No provider/model specified" },
+        { "file": "src/sse/handlers/search.js", "pattern": "Unknown provider" },
         { "file": "src/sse/handlers/search.js", "pattern": "handleComboChat" },
         { "file": "src/sse/handlers/fetch.js", "pattern": "getCombos" },
-        { "file": "src/sse/handlers/fetch.js", "pattern": "getComboModelsFromData" },
-        { "file": "src/sse/handlers/fetch.js", "pattern": "handleComboChat" }
-      ],
-      "warningPatterns": [
-        { "file": "src/sse/handlers/search.js", "pattern": "firstCombo|No provider/model specified|Unknown provider" },
-        { "file": "src/sse/handlers/fetch.js", "pattern": "firstCombo|No provider/model specified|Unknown provider" }
+        { "file": "src/sse/handlers/fetch.js", "pattern": "getFallbackWebCombo" },
+        { "file": "src/sse/handlers/fetch.js", "pattern": "firstCombo" },
+        { "file": "src/sse/handlers/fetch.js", "pattern": "No provider/model specified" },
+        { "file": "src/sse/handlers/fetch.js", "pattern": "Unknown provider" },
+        { "file": "src/sse/handlers/fetch.js", "pattern": "handleComboChat" },
+        { "file": "src/diepxuan/sse/webComboFallback.js", "pattern": "getFirstWebCombo" },
+        { "file": "src/diepxuan/sse/webComboFallback.js", "pattern": "getFallbackWebCombo" }
       ],
       "syntaxCheck": [
         "src/sse/handlers/search.js",
-        "src/sse/handlers/fetch.js"
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
       ]
     },
     {
