@@ -45,8 +45,10 @@ Provider IDs:
 
 ### File cần tồn tại/được giữ
 
-- `src/shared/constants/providers.js`
-- `src/shared/constants/config.js`
+- `src/shared/constants/providers.js` — base hook `extendApiKeyProviders(...)`
+- `src/shared/constants/config.js` — base hook `extendProviderEndpoints(...)`
+- `src/diepxuan/shared/constants/providers.js` — định nghĩa provider AliCode của fork
+- `src/diepxuan/shared/constants/config.js` — định nghĩa endpoint AliCode của fork
 - `src/app/api/providers/validate/route.js`
 - `src/app/api/providers/[id]/test/testUtils.js`
 - `src/app/api/providers/[id]/models/route.js`
@@ -57,14 +59,27 @@ Provider IDs:
 
 ### Điểm đối chiếu code
 
-Trong `src/shared/constants/providers.js` phải có provider:
+Trong `src/shared/constants/providers.js` phải chỉ còn hook mỏng:
 
 ```js
+extendApiKeyProviders(BASE_APIKEY_PROVIDERS)
+```
+
+Trong `src/shared/constants/config.js` phải chỉ còn hook mỏng:
+
+```js
+extendProviderEndpoints(BASE_PROVIDER_ENDPOINTS)
+```
+
+Trong `src/diepxuan/shared/constants/providers.js` phải có provider:
+
+```js
+DIEPXUAN_APIKEY_PROVIDERS
 alicode
 "alicode-intl"
 ```
 
-Trong `src/shared/constants/config.js` phải có endpoint chat completions:
+Trong `src/diepxuan/shared/constants/config.js` phải có endpoint chat completions:
 
 ```js
 alicode: "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
@@ -76,9 +91,12 @@ Trong provider validate/test phải xử lý `alicode` và `alicode-intl` như O
 ### Checklist sau merge upstream
 
 ```bash
-grep -R "alicode" -n src/shared/constants src/app/api/providers open-sse/services open-sse/diepxuan public/providers | head -80
+grep -R "extendApiKeyProviders\|extendProviderEndpoints" -n src/shared/constants | head -40
+grep -R "alicode" -n src/diepxuan/shared/constants src/app/api/providers open-sse/services open-sse/diepxuan public/providers | head -80
 node --check src/shared/constants/providers.js
 node --check src/shared/constants/config.js
+node --check src/diepxuan/shared/constants/providers.js
+node --check src/diepxuan/shared/constants/config.js
 node --check src/app/api/providers/validate/route.js
 node --check src/app/api/providers/[id]/test/testUtils.js
 node --check src/app/api/providers/[id]/models/route.js

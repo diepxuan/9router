@@ -15,6 +15,8 @@
       "requiredFiles": [
         "src/shared/constants/providers.js",
         "src/shared/constants/config.js",
+        "src/diepxuan/shared/constants/providers.js",
+        "src/diepxuan/shared/constants/config.js",
         "src/app/api/providers/validate/route.js",
         "src/app/api/providers/[id]/test/testUtils.js",
         "src/app/api/providers/[id]/models/route.js",
@@ -25,10 +27,13 @@
         "public/providers/alicode-intl.png"
       ],
       "requiredPatterns": [
-        { "file": "src/shared/constants/providers.js", "pattern": "alicode" },
-        { "file": "src/shared/constants/providers.js", "pattern": "alicode-intl" },
-        { "file": "src/shared/constants/config.js", "pattern": "https://coding\\.dashscope\\.aliyuncs\\.com/v1/chat/completions" },
-        { "file": "src/shared/constants/config.js", "pattern": "https://coding-intl\\.dashscope\\.aliyuncs\\.com/v1/chat/completions" },
+        { "file": "src/shared/constants/providers.js", "pattern": "extendApiKeyProviders" },
+        { "file": "src/shared/constants/config.js", "pattern": "extendProviderEndpoints" },
+        { "file": "src/diepxuan/shared/constants/providers.js", "pattern": "DIEPXUAN_APIKEY_PROVIDERS" },
+        { "file": "src/diepxuan/shared/constants/providers.js", "pattern": "alicode" },
+        { "file": "src/diepxuan/shared/constants/providers.js", "pattern": "alicode-intl" },
+        { "file": "src/diepxuan/shared/constants/config.js", "pattern": "https://coding\\.dashscope\\.aliyuncs\\.com/v1/chat/completions" },
+        { "file": "src/diepxuan/shared/constants/config.js", "pattern": "https://coding-intl\\.dashscope\\.aliyuncs\\.com/v1/chat/completions" },
         { "file": "src/app/api/providers/[id]/test/testUtils.js", "pattern": "case \\\"alicode\\\"|case \\\"alicode-intl\\\"" },
         { "file": "src/app/api/providers/[id]/models/route.js", "pattern": "alicode" },
         { "file": "open-sse/config/providers.js", "pattern": "alicode" },
@@ -37,6 +42,8 @@
       "syntaxCheck": [
         "src/shared/constants/providers.js",
         "src/shared/constants/config.js",
+        "src/diepxuan/shared/constants/providers.js",
+        "src/diepxuan/shared/constants/config.js",
         "src/app/api/providers/validate/route.js",
         "src/app/api/providers/[id]/test/testUtils.js",
         "src/app/api/providers/[id]/models/route.js",
