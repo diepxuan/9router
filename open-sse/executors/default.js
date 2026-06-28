@@ -13,7 +13,36 @@ export class DefaultExecutor extends BaseExecutor {
 
   transformRequest(model, body) {
     const transformed = this.applyJsonSchemaFallback(body);
-    return injectReasoningContent({ provider: this.provider, model, body: transformed });
+    const withReasoning = injectReasoningContent({ provider: this.provider, model, body: transformed });
+    return this.stripNvidiaUnsupportedParams(withReasoning);
+  }
+
+  // NVIDIA Chat Completions API (integrate.api.nvidia.com) accepts standard OpenAI
+  // Chat Completions params but rejects OpenAI Responses / Codex SDK extras such as
+  // `text`, `client_metadata`, `reasoning`, `store`, and top-level `parallel_tool_calls`.
+  // Keep this as a conservative allowlist based on NVIDIA's published example payload.
+  stripNvidiaUnsupportedParams(body) {
+    if (this.provider !== "nvidia") return body;
+
+    const NVIDIA_ALLOWED = new Set([
+      "model", "messages",
+      "max_tokens", "max_completion_tokens",
+      "temperature", "top_p", "top_k",
+      "stop", "stream",
+      "presence_penalty", "frequency_penalty",
+      "logit_bias", "user", "seed",
+      "response_format",
+      "tools", "tool_choice"
+    ]);
+
+    const result = {};
+    for (const key of Object.keys(body)) {
+      if (NVIDIA_ALLOWED.has(key)) {
+        result[key] = body[key];
+      }
+    }
+
+    return result;
   }
 
   // Fallback json_schema → json_object for openai-compatible providers without native Structured Output.
