@@ -81,11 +81,7 @@ AI Router & Token Saver — kết nối các công cụ lập trình CLI (Claude
 
 ## 6. Kỷ luật Git (Git Discipline)
 
-- Mỗi tác vụ = 1 nhánh (branch) = 1 Pull Request (PR).
-- Tuyệt đối không push trực tiếp lên nhánh main.
-- **KHÔNG** tạo PR lên `decolua/9router` (upstream) — chỉ tạo trên fork `diepxuan/9router`.
-- Chờ Sếp duyệt trước khi merge.
-- Không chỉnh sửa PR cũ — tạo nhánh mới cho mỗi thay đổi mới.
+> Chi tiết: xem [AGENTS.md §3](./AGENTS.md#3-kỷ-luật-git). Tóm tắt: 1 task = 1 branch = 1 PR, chỉ PR lên fork `diepxuan/9router`, không push `main`, chờ Sếp duyệt.
 
 ---
 
