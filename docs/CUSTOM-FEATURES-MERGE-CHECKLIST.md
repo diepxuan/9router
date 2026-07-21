@@ -56,7 +56,12 @@ Khi rebase upstream, không cần bảo tồn các custom layer liên quan:
 - Hook `getDiepXuanUsageForProvider`, `handleUsageOverrideResponse`, `isDiepXuanUsageEligible`, `extendUsageSupportedProviders` trong base files đã được gỡ.
 - Trang `/dashboard/quota` đã chuyển import về base layer `@/app/(dashboard)/dashboard/usage/components/ProviderLimits` (upstream component, không có alicode).
 
-Lịch sử thay đổi được ghi tại `docs/UPDATE-2026-05-09.md`, `docs/UPDATE-2026-05-11.md`, `docs/UPDATE-2026-06-02.md`. Các tài liệu này giữ nguyên cho mục đích audit, không xóa.
+Lịch sử thay đổi còn trong git history (không còn ở working tree hiện tại):
+- `docs/UPDATE-2026-05-09.md` — commit `e265be41`, `078f628c`
+- `docs/UPDATE-2026-05-11.md`
+- `docs/UPDATE-2026-06-02.md`
+
+Các commit này vẫn truy cập được qua `git show <commit>:docs/UPDATE-2026-05-09.md` cho mục đích audit.
 
 
 ## 1. Fallback web search / web fetch sang combo đầu tiên
@@ -501,59 +506,106 @@ Smoke test theo feature:
 
 ### Mục đích
 
-Toàn bộ hook DiepXuan (Alibaba manual quota, open-sse AliCode usage, combo fail tracker, web fallback, ...) phải đi qua 2 flag runtime để dễ dàng tắt/bật khi debug, smoke test hoặc rebase upstream.
+Toàn bộ hook DiepXuan (combo fail tracker, web fallback, executor NVIDIA strip, ...) phải đi qua 2 flag runtime để dễ dàng tắt/bật khi debug, smoke test hoặc rebase upstream.
 
-Files:
-- `src/diepxuan/shared/config/flags.js`
-- `src/diepxuan/usage/index.js`
-- `src/diepxuan/usage/providers.js`
-- `src/diepxuan/sse/webComboFallback.js`
-- `open-sse/diepxuan/comboHooks.js`
-- `open-sse/diepxuan/services/usageHooks.js`
+> **Cập nhật 2026-07-22:** AliCode manual quota + usage hooks đã bị xóa khỏi fork (xem "Features đã xóa khỏi fork" ở đầu file). Chỉ còn combo fail tracker, web fallback, NVIDIA executor strip đi qua flag.
+
+### Files sử dụng flag (2026-07-22)
+
+| File | Có guard `isDiepXuanEnabled()`? |
+|------|----------------------------------|
+| `src/diepxuan/shared/config/flags.js` | (định nghĩa) |
+| `open-sse/diepxuan/comboHooks.js` | có |
+| `src/diepxuan/sse/webComboFallback.js` | có |
+| `src/diepxuan/app/dashboard/cli-tools/baseUrl.js` | **không cần** (luôn trả giá trị hợp lệ + có fallback tự nhiên; xem ghi chú dưới) |
+| `src/diepxuan/app/dashboard/cli-tools/codex.js` | có (2026-07-22: trả `config` gốc khi disabled, không extend) |
+| `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx` | **không wrap** (always-on: thay thế hoàn toàn base component, wrap = mất feature) |
+| `src/app/api/v1/models/route.js` (NVIDIA resolver + context_length) | có (qua wrapper trong `open-sse/diepxuan/contextLength/*`) |
+| `open-sse/diepxuan/contextLength/index.js` | có (2026-07-22) |
+| `open-sse/diepxuan/contextLength/cache.js` | có (2026-07-22) |
+| `open-sse/diepxuan/contextLength/modelsApi.js` | có (2026-07-22) |
+| `open-sse/diepxuan/contextLength/errorParser.js` | có (2026-07-22) |
+
+> **Ghi chú:**
+> - `baseUrl.js` là pure helper không có side-effect; trả `""` khi không có window. Caller base đã có fallback riêng nên không cần guard. Nếu Sếp muốn tắt hẳn behavior dynamic-origin, đặt `DIEPXUAN_ENABLED=false` + revert commit hook trong base files.
+> - `EnhancedConsoleLog.jsx` thay thế hoàn toàn base component `/dashboard/console-log/page.js`. Khi fork tồn tại thì feature tồn tại; khi fork xóa thì mới mất. Đây là design intentional, không phải "leak".
+> - `open-sse/diepxuan/executorHooks.js` (NVIDIA NIM executor strip) **đã xóa 2026-07-22** vì là dead code (function `stripNvidiaUnsupportedParams` không ai import/gọi). Nếu sau này cần wire NVIDIA strip, tạo lại file và wrap với `isDiepXuanEnabled()`.
+> - `src/diepxuan/app/api/console-logs-structured/route.js` (API route structured log) **đã xóa 2026-07-22** vì là dead code. `EnhancedConsoleLog.jsx` dùng logic `parseLogsIntoRequests` inline, không gọi API này.
 
 ### Flag
 
 - `DIEPXUAN_ENABLED` (mặc định `true`)
-  - `false`: tất cả hook DiepXuan trả về giá trị “no-op” (`null`/`false`), giữ nguyên hành vi upstream.
+  - `false`: tất cả hook DiepXuan có guard trả về giá trị "no-op" (`null`/`false`), giữ nguyên hành vi upstream.
 - `DIEPXUAN_SAFE_MODE` (mặc định `false`)
-  - `true`: dành cho các hook ghi/đo lường, tắt ghi DB và override usage; chỉ giữ phần đọc an toàn.
-  - Hiện dùng cho `isDiepXuanUsageHookSafe()` nếu sau này mở rộng.
+  - `true`: dành cho các hook ghi/đo lường, tắt ghi DB và override; chỉ giữ phần đọc an toàn.
+  - Hiện chưa có hook nào dùng safe mode (reserved cho tương lai).
 
 ### Helper quan trọng
 
 ```js
-isDiepXuanEnabled()
-isDiepXuanSafeMode()
+isDiepXuanEnabled()        // process.env.DIEPXUAN_ENABLED, default true
+isDiepXuanSafeMode()       // process.env.DIEPXUAN_SAFE_MODE, default false
+DIE_PXUAN_FLAGS            // namespace object (chưa được dùng)
 ```
 
 ### Checklist sau merge upstream
 
 ```bash
-grep -n "isDiepXuanEnabled\|DIEPXUAN_ENABLED" src/diepxuan/shared/config/flags.js src/diepxuan/usage src/diepxuan/sse open-sse/diepxuan
+# Flag định nghĩa còn nguyên
+grep -q "isDiepXuanEnabled" src/diepxuan/shared/config/flags.js
+
+# Hook còn nguyên và có guard (trừ file TODO ở trên)
+grep -q "isDiepXuanEnabled" open-sse/diepxuan/comboHooks.js
+grep -q "isDiepXuanEnabled" open-sse/diepxuan/executorHooks.js
+grep -q "isDiepXuanEnabled" src/diepxuan/sse/webComboFallback.js
+
+# Syntax check
 node --check src/diepxuan/shared/config/flags.js
 node --check src/diepxuan/sse/webComboFallback.js
 node --check open-sse/diepxuan/comboHooks.js
-node --check open-sse/diepxuan/services/usageHooks.js
+node --check open-sse/diepxuan/executorHooks.js
+
+# Test
+cd tests && NODE_PATH=/tmp/node_modules /tmp/node_modules/.bin/vitest run diepxuan-feature-flags
 ```
 
 ### Smoke test
 
 1. Bật mặc định (`DIEPXUAN_ENABLED=true`):
-   - request search/fetch không provider → fallback combo.
-   - request usage cho AliCode → trả manual quota.
+   - request `/api/v1/search` không provider → fallback combo đầu tiên.
+   - combo fail liên tiếp 3 lần → model bị skip 5 phút.
+   - `/api/v1/models` → mỗi model LLM có field `context_length`.
+   - Codex config có `[agents.subagent].description = "9Router subagent..."`.
 2. Tắt bằng `DIEPXUAN_ENABLED=false`:
-   - request search/fetch → trả lỗi thiếu provider/model như upstream.
-   - request usage cho AliCode → fallback upstream API.
+   - request `/api/v1/search` không provider → trả lỗi thiếu provider như upstream.
+   - combo fail không bị track (mỗi lần retry đều thử lại).
+   - `/api/v1/models` → KHÔNG có field `context_length` (giống upstream).
+   - Codex config KHÔNG có `description` trong `[agents.subagent]` (giống upstream).
+   - `EnhancedConsoleLog` + dynamic origin CLI tools vẫn chạy (always-on, không wrap).
 
 ---
 
 ## 12. Ghi chú lần kiểm tra gần nhất
 
-Lần kiểm tra gần nhất trong workspace:
-- `npm run build`: pass.
-- `node --check` các file custom chính: pass.
-- Unit test bằng `node --test` không chạy được vì test suite dùng `vitest` nhưng dependency `vitest` chưa có trong package hiện tại.
-- Local branch tại thời điểm kiểm tra từng có trạng thái `main...origin/main [behind 1]` do automation tạo thêm commit build trên origin.
+Lần kiểm tra gần nhất: **2026-07-22** (branch `diepxuan`, PR #46).
+
+### Verify kết quả (sau lần refactor thứ 2)
+
+- `node scripts/diepxuan/check-custom-features.mjs`: **360 PASS / 0 WARN / 0 FAIL**.
+  - Số check giảm từ 369 → 360 do xóa 9 check của feature `nvidia-executor-strip` (file dead code đã xóa).
+  - Số features: 14 (tăng từ 13 nhờ thêm `auto-context-length`; giảm 1 vì xóa `nvidia-executor-strip`).
+  - FAIL cũ (`fork-branding-header` — `DonateModal.js`) đã fix bằng cách bỏ `forbiddenFiles`, chỉ giữ `forbiddenPatterns` (xem entry manifest + mục "Fork branding header" ở trên).
+- `node --check` tất cả file fork layer + base files bị sửa: PASS.
+- `npm run build`: **PASS** (chạy ngoài sandbox với `npm install` trước để có `@next/third-parties@^16.2.9`).
+  - Trong Codex sandbox (`/data/9router`) build fail vì sandbox chặn `fonts.googleapis.com` — không phải bug code. Xem `TOOLS.md §7`.
+- Test `tests/unit/{combo-immediate-fallback-node.test.mjs,diepxuan-feature-flags.test.js}`: chưa chạy (test setup dùng `NODE_PATH=/tmp/node_modules` + `vitest`, cần env riêng).
+
+### Trạng thái git tại thời điểm kiểm tra
+
+- Branch: `diepxuan` (local) sync với `origin/diepxuan`.
+- Base: `origin/main` (`79918c78`, v0.5.40 ngày 2026-07-20).
+- Working tree: nhiều file modified (sẽ squash thành 1 commit trước khi push update PR #46).
+- 14 features trong manifest (tăng từ 13 nhờ thêm `auto-context-length`; giảm 1 vì xóa `nvidia-executor-strip`).
 
 Khi dùng tài liệu này trong lần sau, luôn kiểm tra lại trạng thái git hiện tại thay vì dựa vào ghi chú cũ.
 
@@ -757,3 +809,124 @@ bash -n dev.sh
 - Không tự ý chuyển `dev.sh` sang thư mục khác.
 - Không tự ý chạy `./dev.sh start|stop|restart` trong session agent nếu anh chưa yêu cầu, vì script cần root và chạm `/etc/hosts`/systemd.
 - Khi rebase upstream, nếu `dev.sh` conflict thì ưu tiên giữ behavior nội bộ ở trên.
+
+
+
+## 17. NVIDIA NIM executor strip (open-sse/diepxuan/executorHooks.js)
+
+### Mục đích
+
+NVIDIA Chat Completions API (`integrate.api.nvidia.com`) chấp nhận params OpenAI Chat Completions chuẩn nhưng reject các param OpenAI Responses / Codex SDK extras (`text`, `client_metadata`, `reasoning`, `store`, top-level `parallel_tool_calls`, ...) với HTTP 400.
+
+Hook này strip các param không supported trước khi gửi tới NVIDIA.
+
+> **Cảnh báo 2026-07-22:** File `open-sse/diepxuan/executorHooks.js` hiện đang là **DEAD CODE** — function `stripNvidiaUnsupportedParams` được export nhưng **không có chỗ nào trong codebase gọi nó**. Có thể là hook dở dang chưa wire vào base executor. Cần quyết định: xóa file, hoặc wire vào `open-sse/executors/openaiChat.js` (hoặc tương đương) trước khi upstream stable.
+
+### File cần giữ
+
+- `open-sse/diepxuan/executorHooks.js` (37 dòng)
+
+### Logic cần giữ
+
+```js
+import { isDiepXuanEnabled } from "../../src/diepxuan/shared/config/flags.js";
+
+const NVIDIA_ALLOWED = new Set([
+  "model", "messages",
+  "max_tokens", "max_completion_tokens",
+  "temperature", "top_p", "top_k",
+  "stop", "stream",
+  "presence_penalty", "frequency_penalty",
+  "logit_bias", "user", "seed",
+  "response_format",
+  "tools", "tool_choice",
+]);
+
+export function stripNvidiaUnsupportedParams(provider, body) {
+  if (!isDiepXuanEnabled()) return body;
+  if (provider !== "nvidia") return body;
+  // ...
+}
+```
+
+### Checklist sau merge upstream
+
+```bash
+test -f open-sse/diepxuan/executorHooks.js
+grep -q "stripNvidiaUnsupportedParams" open-sse/diepxuan/executorHooks.js
+grep -q "isDiepXuanEnabled" open-sse/diepxuan/executorHooks.js
+node --check open-sse/diepxuan/executorHooks.js
+```
+
+### Smoke test khuyến nghị
+
+1. Tạo NVIDIA connection, gửi request có `text`, `client_metadata`.
+2. Trước wire: request fail 400.
+3. Sau wire (khi có caller): request pass.
+
+---
+
+## 18. /v1/models context_length enrichment
+
+### Mục đích
+
+Enrich mỗi LLM model trong response `/api/v1/models` với field `context_length` (max input tokens). Codex CLI / OpenAI clients dùng field này để:
+- Hiển thị context window cho user.
+- Validate request trước khi gửi (tránh 400).
+- Quyết định có cần truncate history không.
+
+### Cơ chế
+
+Trong `buildModelsList()` của `src/app/api/v1/models/route.js`, sau khi dedupe model IDs, mỗi model được lookup qua `getContextLengthBatchCached()`:
+
+1. **Cache hit** (SQLite, từ lần trước) → trả về ngay.
+2. **Cache miss** → fallback `getStaticContextLength()` (MODEL_INFO từ upstream).
+3. **Cache miss + không có static** → bỏ qua (model không có `context_length`).
+
+### Base file bị sửa
+
+`src/app/api/v1/models/route.js`:
+- Import `getContextLengthBatchCached` + `getStaticContextLength` từ `open-sse/diepxuan/contextLength/index.js`.
+- Register NVIDIA resolver trong `LIVE_MODEL_RESOLVERS`:
+  ```js
+  nvidia: async (conn) => {
+    const result = await resolveProviderModelsWithContext(conn);
+    return result?.models?.length ? result : null;
+  }
+  ```
+- Trong loop dedupe: gọi `getContextLengthBatchCached` một lần cho tất cả model IDs (batch), rồi set `model.context_length = cached?.contextLength || getStaticContextLength(model.id)`.
+
+### Fork layer files (xem §13)
+
+- `open-sse/diepxuan/contextLength/cache.js` — SQLite cache.
+- `open-sse/diepxuan/contextLength/modelsApi.js` — NVIDIA `/v1/models` API.
+- `open-sse/diepxuan/contextLength/errorParser.js` — Parse 400 error.
+- `open-sse/diepxuan/contextLength/index.js` — Public API.
+
+### Checklist sau merge upstream
+
+```bash
+# Imports còn nguyên
+grep -q "getContextLengthBatchCached" src/app/api/v1/models/route.js
+grep -q "getStaticContextLength" src/app/api/v1/models/route.js
+grep -q "resolveProviderModelsWithContext" src/app/api/v1/models/route.js
+grep -q "LIVE_MODEL_RESOLVERS" src/app/api/v1/models/route.js
+
+# Pattern enrich còn nguyên
+grep -q "context_length" src/app/api/v1/models/route.js
+
+# Syntax check
+node --check src/app/api/v1/models/route.js
+node --check open-sse/diepxuan/contextLength/index.js
+node --check open-sse/diepxuan/contextLength/cache.js
+node --check open-sse/diepxuan/contextLength/modelsApi.js
+node --check open-sse/diepxuan/contextLength/errorParser.js
+```
+
+### Smoke test khuyến nghị
+
+```bash
+# Khởi động server, gọi /v1/models
+curl -sS http://localhost:20128/api/v1/models | jq '.data[] | select(.id | contains("nvidia")) | {id, context_length}'
+# → phải có context_length cho model NVIDIA
+```
