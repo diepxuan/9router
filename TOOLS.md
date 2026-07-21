@@ -54,20 +54,43 @@
 ## 7. Build & verify sau mỗi thay đổi
 
 ```bash
-# 1. Kiểm tra custom feature còn nguyên (chạy nhanh, ~5s)
+# 1. Kiem tra custom feature con nguyen (chay nhanh, ~5s)
 node scripts/diepxuan/check-custom-features.mjs
 
-# 2. Production build (chạy ~3-5 phút, bắt lỗi import runtime)
+# 2. Production build (chay ~3-5 phut, bat loi import runtime)
 npm run build
 
-# Cả hai phải PASS trước khi push.
+# Ca hai phai PASS truoc khi push.
 ```
 
-Script check manifest dựa trên `docs/custom-features.manifest.json` — 11 features, 314+ check, gồm:
+Script check manifest dua tren `docs/custom-features.manifest.json` — 11 features, 314+ check, gom:
 
-- File tồn tại / pattern xuất hiện
+- File ton tai / pattern xuat hien
 - `node --check` syntax
-- Phát hiện conflict marker còn sót sau rebase
+- Phat hien conflict marker con sot sau rebase
+
+### Luu y quan trong: `npm run build` trong Codex sandbox
+
+Trong moi truong Codex sandbox (`/data/9router`), `npm run build` **fail** vi sandbox chan network ra ngoai:
+
+```
+getaddrinfo EAI_AGAIN fonts.googleapis.com
+Failed to fetch `Inter` from Google Fonts.
+./src/app/layout.js
+Module not found: Can't resolve '@next/third-parties/google'
+```
+
+Day **khong phai bug code** — `next/font/google` can fetch Inter font tu `fonts.googleapis.com` luc build, sandbox chan DNS. Loi nay da ghi nhan trong nhat ky `memory/2026-07-21.md` va `memory/2026-07-22.md`.
+
+**Quy trinh dung:**
+
+1. Trong sandbox: chi chay `node scripts/diepxuan/check-custom-features.mjs` va `node --check <file>` (khong can network).
+2. Build production: **phai chay ngoai sandbox** voi `sandbox_permissions: require_escalated` (xem §13 quy trinh 6 buoc).
+3. Sau khi build PASS ngoai sandbox, moi push len fork.
+
+**Khi build fail trong sandbox:**
+
+Chi can escalate lenh build ra ngoai sandbox va bao cao Sep ket qua.
 
 ## 8. Rebase upstream (master)
 
@@ -148,7 +171,6 @@ Theo `AGENTS.md` §7, tạo hoặc cập nhật `docs/UPDATE-YYYY-MM-DD.md` khi:
 | `DOCKER.md`                               | Hướng dẫn Docker                               |
 | `README.md`                               | Giới thiệu dự án                               |
 | `memory/YYYY-MM-DD.md`                    | Nhật ký hàng ngày                              |
-
 
 ## 13. Sandbox & Escalation
 
@@ -247,7 +269,7 @@ Quy tắc: DỪNG -> báo cáo Sếp kèm runtime + lệnh -> chờ Sếp xác n
 
 ## 14. Khi nào PHẢI escalate ngay (không chờ lệnh fail)
 
-| Tình huống | Hành động |
+| Tình huống                                     | Hành động                      |
 | ---------------------------------------------- | ------------------------------ |
 | `.git` không thể ghi (zfs `ro`, lock, ...)     | Báo Sếp ngay, không tự remount |
 | Proxy ngừng hoạt động > 5 phút                 | Báo Sếp NGAY                   |
