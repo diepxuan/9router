@@ -8,7 +8,7 @@
 
 ## 1. Môi trường (Development)
 
-- **Workspace:** `/root/.openclaw/workspace/projects/9router/`
+- **Workspace:** `/data/9router` (Codex CLI) hoặc `/root/.openclaw/workspace/projects/9router` (OpenClaw). Xem [IDENTITY.md §2](./IDENTITY.md#2-cấu-hình-agent-openclawjson).
 - **Dashboard:** `http://9router.diepxuan.corp:3000/`
 - **Cổng Proxy:** `3000` (chỉ định bởi Sếp, 2026-07-21)
 - **Node:** v22.22.2
@@ -39,7 +39,7 @@
 ## 5. Triển khai (Deployment)
 
 - Docker + CapRover
-- File cấu hình: `captain-definition`, `diepxuan.config.mjs`
+- File cấu hình: `captain-definition` (CapRover trỏ `Dockerfile` ở root)
 - Đồng bộ runtime về host: `bash scripts/sync.sh`
 
 ## 6. Kiểm thử (Testing)

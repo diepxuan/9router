@@ -49,7 +49,7 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 | Vấn đề | Trạng thái | Ghi chú |
 |-------|--------|-------|
 | CHANGELOG bị ngắt quãng | Không còn áp dụng | Fork đã chuyển sang dùng `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` làm changelog duy nhất (theo AGENTS.md §7). `CHANGELOG.md` giữ nguyên bản upstream làm tham chiếu. |
-| Tài liệu Identity trùng lặp | Đang xử lý | PA A single source of truth — đang refactor trên nhánh `docs/identity-audit`. |
+| Tài liệu Identity trùng lặp | Đã xử lý (PR #44, 2026-07-21) | PA A single source of truth đã merge. Tổng dòng 956 -> 731 (-23.5%). Xem PR https://github.com/diepxuan/9router/pull/44. |
 | Workspace `.git` read-only | Đã ghi nhận (2026-07-21) | `.git` mount `ro` trong môi trường dev hiện tại — mọi thao tác tạo nhánh/commit/cherry-pick cần Sếp phê duyệt. Xem `TOOLS.md §13`. |
 
 ---
