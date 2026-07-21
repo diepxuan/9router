@@ -120,19 +120,6 @@ Mục đích: giúp các agent/session khác (kể cả aiagent hoặc session m
 - Nếu mắc lỗi (sửa nhầm base file thay vì fork layer), ghi rõ lỗi đó để các agent/session khác tránh lặp lại.
 - Không xóa nội dung cũ; chỉ thêm mới hoặc cập nhật section hiện có.
 
-### Trigger tạo tài liệu
-
-**Tạo hoặc cập nhật tài liệu khi:**
-
-- Thêm nhà cung cấp (provider) mới.
-- Thay đổi logic nén RTK compression.
-- Sửa fallback routing.
-- Thay đổi dashboard UI đáng kể.
-- Sửa lỗi ảnh hưởng đến proxy/token savings.
-
-**File tài liệu:** `docs/UPDATE-YYYY-MM-DD.md` (chi tiết kỹ thuật)
-**Changelog (bắt buộc):** `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md`
-
 ---
 
 ## 8. Xử lý Sự cố (Failure Handling)
