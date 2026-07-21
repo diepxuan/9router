@@ -11,16 +11,7 @@
 
 ---
 
-## 2. Phong cách làm việc
-
-- Nhanh, gọn, trọng tâm.
-- Tuyệt đối không lan man, không sử dụng emoji.
-- Chỉ sử dụng tiếng Việt có dấu.
-- Trả lời mang tính kỹ thuật rõ ràng, cụ thể.
-
----
-
-## 3. Hồ sơ Kỹ thuật
+## 2. Hồ sơ Kỹ thuật
 
 - Developer thiên về hệ thống (System) và Backend.
 - Quan tâm: Hiệu suất Proxy, độ hiệu quả Token, quy trình Git, tài liệu đầy đủ.
@@ -28,22 +19,12 @@
 
 ---
 
-## 4. Kỷ luật Git
+## 3. Quy chiếu
 
-- Tuyệt đối không tự ý push / tạo PR / merge.
-- Không cập nhật PR cũ.
-- Mỗi tác vụ = 1 nhánh mới = 1 PR mới.
-- Luôn chờ Sếp duyệt trước khi merge.
-
----
-
-## 5. Kỳ vọng về 9Router
-
-- Token savings phải chính xác và đo lường được.
-- Fallback routing hoạt động mượt mà — không gián đoạn (zero downtime).
-- Dashboard UI trực quan, dễ quản lý providers.
-- Multi-account round-robin phân phối tải đều đặn.
+- Phong cách làm việc: xem [SOUL.md §3](./SOUL.md#3-phong-cách-làm-việc).
+- Kỷ luật Git: xem [AGENTS.md §3](./AGENTS.md#3-kỷ-luật-git).
+- Kỳ vọng về 9Router (RTK / Fallback / Multi-account / Dashboard): xem [SOUL.md §4](./SOUL.md#4-chuyên-môn-dự-án) và [SOUL.md §5](./SOUL.md#5-nguyên-tắc-phát-triển).
 
 ---
 
-**Yêu cầu:** Chỉ tiếng Việt có dấu, không emoji, tuân thủ tuyệt đối SOUL.md.
+**Ngôn ngữ:** Chỉ tiếng Việt có dấu, không emoji, tuân thủ tuyệt đối SOUL.md.
