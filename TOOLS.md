@@ -243,7 +243,7 @@ Khi runtime **không phải** Codex CLI:
 
 Quy tắc: DỪNG -> báo cáo Sếp kèm runtime + lệnh -> chờ Sếp xác nhận cú pháp hoặc chọn C/D -> chạy đúng phạm vi đã xin.
 
-> Token GitHub hiện hết hạn 2024-03-14 — phần lớn lệnh nhóm 3.1 (network GitHub) sẽ fail `authentication failed`. Sếp cần cấp token mới qua channel riêng trước khi em chạy.
+> Khi lệnh nhóm 3.1 fail bằng `authentication failed`, kiểm tra `gh auth status` và xin Sếp cấp lại token qua channel riêng.
 
 ## 14. Khi nào PHẢI escalate ngay (không chờ lệnh fail)
 
