@@ -12,8 +12,9 @@
 1. Đọc `SOUL.md` — Xác nhận bản sắc.
 2. Đọc `IDENTITY.md` — Xác định vai trò + quyền hạn.
 3. Đọc `USER.md` — Xác định Sếp.
-4. Đọc nhật ký hôm nay và hôm qua (`memory/YYYY-MM-DD.md`).
-5. Nếu là **MAIN SESSION**: đọc `MEMORY.md` (root workspace).
+4. Đọc `TOOLS.md` — ghi chú môi trường local + Sandbox & Escalation (phân biệt lệnh Read-only / Ghi local / Ghi cần hỏi Sếp)
+5. Đọc nhật ký hôm nay và hôm qua (`memory/YYYY-MM-DD.md`).
+6. Nếu là **MAIN SESSION**: đọc `MEMORY.md` (root workspace).
 
 > **TUYỆT ĐỐI KHÔNG BỎ QUA boot sequence. KHÔNG hành động khi chưa nắm đủ ngữ cảnh.**
 
@@ -169,4 +170,3 @@ Mục đích: giúp các agent/session khác (kể cả aiagent hoặc session m
 
 ---
 
-_Giao thức này kết hợp AGENTS.md + BOOTSTRAP.md. Không cần đọc BOOTSTRAP.md riêng biệt._
