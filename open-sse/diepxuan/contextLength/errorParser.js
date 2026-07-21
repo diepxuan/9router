@@ -4,6 +4,7 @@
  */
 
 import { upsertContextLength, SOURCE_ERROR } from "./cache.js";
+import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 
 // Match patterns from different providers
 // OpenAI: "context_length_exceeded ... maximum context length is 8192 tokens"
@@ -24,6 +25,7 @@ const PATTERNS = [
  * @returns {number|null} Context length in tokens, or null
  */
 export function extractContextLengthFromError(status, errorText) {
+  if (!isDiepXuanEnabled()) return null;
   if (status !== 400 && status !== 413) return null;
   if (!errorText || typeof errorText !== "string") return null;
 
@@ -45,6 +47,7 @@ export function extractContextLengthFromError(status, errorText) {
  * @param {string} modelId - Full model ID, e.g. "nvidia/minimaxai/minimax-m2.7"
  */
 export function updateContextLengthFromError(status, errorText, modelId) {
+  if (!isDiepXuanEnabled()) return null;
   if (!modelId) return null;
   const length = extractContextLengthFromError(status, errorText);
   if (length) {

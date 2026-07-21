@@ -98,6 +98,7 @@ export function getCachedContextLength(modelId) {
  * @param {"api"|"error"|"static"} source
  */
 export function upsertContextLength(modelId, contextLength, source) {
+  if (!isDiepXuanEnabled()) return;
   if (!modelId || typeof contextLength !== "number" || contextLength <= 0) return;
   const db = getDb();
   if (!db) return;

@@ -4,6 +4,7 @@
  */
 
 import { upsertContextLength, SOURCE_API } from "./cache.js";
+import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -33,6 +34,8 @@ const PROVIDER_ENDPOINTS = {
  * @returns {Promise<number>} Number of models updated in cache
  */
 export async function fetchProviderContextLengths(providerId) {
+  if (!isDiepXuanEnabled()) return [];
+
   const endpoint = PROVIDER_ENDPOINTS[providerId];
   if (!endpoint) return 0;
 
@@ -70,6 +73,7 @@ export async function fetchProviderContextLengths(providerId) {
  * @param {object} connection - Connection record from DB
  */
 export async function resolveProviderModelsWithContext(connection) {
+  if (!isDiepXuanEnabled()) return null;
   if (!connection?.provider) return null;
 
   const providerId = connection.provider;

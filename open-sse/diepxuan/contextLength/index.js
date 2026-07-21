@@ -6,6 +6,7 @@
 import { getCachedContextLength, getCachedContextLengthBatch, upsertContextLength, initContextLengthCache, SOURCE_STATIC } from "./cache.js";
 import { fetchProviderContextLengths, hasProviderModelsApi } from "./modelsApi.js";
 import { extractContextLengthFromError, updateContextLengthFromError } from "./errorParser.js";
+import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 
 let initialized = false;
 
@@ -29,6 +30,7 @@ function ensureInit() {
  * @returns {Promise<{contextLength: number, source: string}|null>}
  */
 export async function getContextLength(modelId) {
+  if (!isDiepXuanEnabled()) return null;
   ensureInit();
   if (!modelId) return null;
 
@@ -54,6 +56,7 @@ export async function getContextLength(modelId) {
  * @returns {Map<string, {contextLength: number, source: string}>}
  */
 export function getContextLengthBatchCached(modelIds) {
+  if (!isDiepXuanEnabled()) return new Map();
   ensureInit();
   return getCachedContextLengthBatch(modelIds || []);
 }
@@ -90,6 +93,10 @@ const MODEL_INFO = {
  */
 export function getStaticContextLength(modelId) {
   if (!modelId) return null;
+  if (!isDiepXuanEnabled()) {
+    // Skip DB upsert + still return static value as a passthrough (read-only fallback).
+    return MODEL_INFO[modelId] || null;
+  }
 
   // Direct hit
   if (MODEL_INFO[modelId]) {
@@ -118,6 +125,7 @@ export function getStaticContextLength(modelId) {
  * @returns {number|null}
  */
 export function getContextLengthSync(modelId) {
+  if (!isDiepXuanEnabled()) return null;
   ensureInit();
   if (!modelId) return null;
 
