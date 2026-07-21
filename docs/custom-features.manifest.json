@@ -6,7 +6,8 @@
     "upstream": "decolua/9router",
     "forkBranch": "main",
     "upstreamBranch": "master",
-    "checkCommand": "node scripts/diepxuan/check-custom-features.mjs"
+    "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
+    "note": "Schema 1. As of 2026-07-22, 14 features (was 13: added auto-context-length; removed nvidia-executor-strip because open-sse/diepxuan/executorHooks.js was deleted as confirmed dead code on 2026-07-22). fork-branding-header: removed forbiddenFiles rule because upstream added DonateModal.js back in v0.5.40 (commit ccb0842d). Fork keeps file but strips import in Header.js."
   },
   "features": [
     {
@@ -369,10 +370,7 @@
     },
     {
       "id": "fork-branding-header",
-      "description": "Fork branding keeps upstream Header structure while removing Donate UI/modal.",
-      "forbiddenFiles": [
-        "src/shared/components/DonateModal.js"
-      ],
+      "description": "Fork branding keeps upstream Header structure while removing Donate UI/modal. Note 2026-07-22: DonateModal.js may exist on disk (upstream added it back in v0.5.40 via commit ccb0842d); the fork only removes its import + UI from Header.",
       "forbiddenPatterns": [
         {
           "file": "src/shared/components/Header.js",
@@ -609,6 +607,72 @@
           "file": "dev.sh",
           "pattern": "start_prod_service"
         }
+      ]
+    },
+    {
+      "id": "auto-context-length",
+      "description": "Auto context length info: cache + provider API + error parser + enrich /v1/models response with context_length field.",
+      "requiredFiles": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getStaticContextLength"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "context_length"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "LIVE_MODEL_RESOLVERS"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/modelsApi.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/cache.js",
+          "pattern": "contextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/errorParser.js",
+          "pattern": "extractContextLengthFromError"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "context_length\\s*=\\s*contextLength"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js"
       ]
     }
   ]
