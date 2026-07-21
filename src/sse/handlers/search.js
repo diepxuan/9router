@@ -12,7 +12,8 @@ import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
 import { HTTP_STATUS } from "open-sse/config/runtimeConfig.js";
 import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
-import { handleComboChat, getComboModelsFromData } from "open-sse/services/combo.js";
+import { handleComboChat } from "open-sse/services/combo.js";
+import { handleDiepXuanWebComboFallback } from "@/diepxuan/sse/webComboFallback.js";
 
 /**
  * Handle web search request for the SSE/Next.js server.
@@ -58,33 +59,31 @@ export async function handleSearch(request) {
     }
   }
 
-  if (!providerInput || typeof providerInput !== "string") {
-    log.warn("SEARCH", "Missing provider/model");
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: provider (or model)");
-  }
-
   if (!query || typeof query !== "string" || !query.trim()) {
     log.warn("SEARCH", "Missing query");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: query");
   }
 
-  // Combo expansion: providerInput may be a combo name → run fallback/round-robin across providers
   const combos = await getCombos();
-  const comboModels = getComboModelsFromData(providerInput, combos);
-  if (comboModels) {
-    const comboStrategies = settings.comboStrategies || {};
-    const comboStrategy = comboStrategies[providerInput]?.fallbackStrategy || settings.comboStrategy || "fallback";
-    const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-    log.info("SEARCH", `Combo "${providerInput}" with ${comboModels.length} providers (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
-    return handleComboChat({
-      body,
-      models: comboModels,
-      handleSingleModel: (b, m) => handleSingleProviderSearch(b, m, request, apiKey, settings),
-      log,
-      comboName: providerInput,
-      comboStrategy,
-      comboStickyLimit
-    });
+  const providerId = providerInput && typeof providerInput === "string" ? resolveProviderId(providerInput) : null;
+  const resolvedProvider = providerId ? AI_PROVIDERS[providerId] : null;
+  const customComboResponse = await handleDiepXuanWebComboFallback({
+    body,
+    providerInput,
+    combos,
+    kind: "webSearch",
+    resolvedProvider,
+    settings,
+    handleComboChat,
+    handleSingleModel: (b, m) => handleSingleProviderSearch(b, m, request, apiKey, settings),
+    log,
+    logScope: "SEARCH",
+  });
+  if (customComboResponse) return customComboResponse;
+
+  if (!providerInput || typeof providerInput !== "string") {
+    log.warn("SEARCH", "No provider/model specified and no webSearch combo available");
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, "No provider/model specified and no webSearch combo available");
   }
 
   return handleSingleProviderSearch(body, providerInput, request, apiKey, settings);

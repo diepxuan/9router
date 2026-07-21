@@ -83,10 +83,10 @@ if (args[0] === "xai" && args[1] === "video") {
 // Self-heal SQLite runtime deps (sql.js + better-sqlite3) into ~/.9router/runtime
 // so the server can resolve them via NODE_PATH. Best-effort — sql.js is required,
 // better-sqlite3 is optional. Logs to stderr only on failure.
-try { ensureSqliteRuntime({ silent: true }); } catch {}
+try { ensureSqliteRuntime({ silent: true }); } catch { }
 
 // Self-heal tray runtime (systray for macOS/Linux only). Windows skipped.
-try { ensureTrayRuntime({ silent: true }); } catch {}
+try { ensureTrayRuntime({ silent: true }); } catch { }
 
 // Configuration constants
 const APP_NAME = pkg.name; // Use from package.json
@@ -254,9 +254,9 @@ function killAllAppProcesses(appPort) {
       // killing them doesn't free the app port, so don't block the critical path.
       // Server-side MITM manager has stale-lock recovery and starts deferred (~3s).
       setImmediate(() => {
-        try { killProxyByPidFile(); } catch {}
-        try { killTunnelByPidFile(); } catch {}
-        try { killCloudflaredByAppPort(appPort); } catch {}
+        try { killProxyByPidFile(); } catch { }
+        try { killTunnelByPidFile(); } catch { }
+        try { killCloudflaredByAppPort(appPort); } catch { }
       });
 
       const platform = process.platform;
@@ -710,7 +710,7 @@ function startServer(updatePromise) {
   if (trayMode) {
     // Ignore SIGHUP so macOS terminal close doesn't kill the background tray process
     process.removeAllListeners("SIGHUP");
-    process.on("SIGHUP", () => {});
+    process.on("SIGHUP", () => { });
 
     console.log(`\n🚀 ${pkg.name} v${pkg.version}`);
     console.log(`Server: http://${displayHost}:${port}`);
@@ -771,7 +771,7 @@ function startServer(updatePromise) {
             // macOS: keep current process alive — spawning a detached child puts
             // it outside the login session so NSStatusItem silently fails.
             process.removeAllListeners("SIGHUP");
-            process.on("SIGHUP", () => {});
+            process.on("SIGHUP", () => { });
 
             console.log(`\n⏳ Switching to tray mode... (icon already visible in menu bar)`);
             console.log(`🔔 9Router is running in tray (PID: ${process.pid})`);
