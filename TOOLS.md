@@ -243,7 +243,7 @@ Khi runtime **không phải** Codex CLI:
 
 Quy tắc: DỪNG -> báo cáo Sếp kèm runtime + lệnh -> chờ Sếp xác nhận cú pháp hoặc chọn C/D -> chạy đúng phạm vi đã xin.
 
-> Khi lệnh nhóm 3.1 fail bằng `authentication failed`, kiểm tra `gh auth status` và xin Sếp cấp lại token qua channel riêng.
+> Khi lệnh nhóm 3.1 fail bằng `authentication failed` dù đã chạy ngoài sandbox (`require_escalated`), kiểm tra `gh auth status` và xin Sếp cấp lại token qua channel riêng. Nếu fail trong sandbox, root cause là sandbox chặn network chứ không phải token — phải escalate lệnh ra ngoài sandbox trước.
 
 ## 14. Khi nào PHẢI escalate ngay (không chờ lệnh fail)
 
