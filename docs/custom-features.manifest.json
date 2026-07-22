@@ -1,0 +1,679 @@
+{
+  "schemaVersion": 1,
+  "description": "Machine-readable guardrails for DiepXuan fork custom features that must survive upstream master rebases.",
+  "rebaseBaseline": {
+    "fork": "diepxuan/9router",
+    "upstream": "decolua/9router",
+    "forkBranch": "main",
+    "upstreamBranch": "master",
+    "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
+    "note": "Schema 1. As of 2026-07-22, 14 features (was 13: added auto-context-length; removed nvidia-executor-strip because open-sse/diepxuan/executorHooks.js was deleted as confirmed dead code on 2026-07-22). fork-branding-header: removed forbiddenFiles rule because upstream added DonateModal.js back in v0.5.40 (commit ccb0842d). Fork keeps file but strips import in Header.js."
+  },
+  "features": [
+    {
+      "id": "combo-fail-tracker",
+      "description": "Combo fallback skips models after repeated failures through a DiepXuan hook layer.",
+      "requiredFiles": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js",
+        "src/app/api/settings/route.js",
+        "tests/unit/combo-immediate-fallback-node.test.mjs"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "afterComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "shouldSkipComboModel"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "recordComboModelOutcome"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "afterComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboFailTracker.js",
+          "pattern": "MAX_FAILS"
+        },
+        {
+          "file": "src/app/api/settings/route.js",
+          "pattern": "resetComboFailTracker"
+        },
+        {
+          "file": "tests/unit/combo-immediate-fallback-node.test.mjs",
+          "pattern": "combo fallback immediately tries next model"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "beforeComboModelAttempt\\(\\{\\s*modelStr,\\s*comboName,\\s*log\\s*\\}\\)"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "afterComboModelAttempt\\(\\{\\s*modelStr,\\s*comboName,\\s*ok:"
+        },
+        {
+          "file": "src/app/api/settings/route.js",
+          "pattern": "resetComboFailTracker\\(\\)"
+        },
+        {
+          "file": "tests/unit/combo-immediate-fallback-node.test.mjs",
+          "pattern": "handleComboChat"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js",
+        "src/app/api/settings/route.js",
+        "tests/unit/combo-immediate-fallback-node.test.mjs"
+      ]
+    },
+    {
+      "id": "enhanced-console-log",
+      "description": "DiepXuan console log dashboard renders the enhanced request/log inspector instead of the upstream console log client.",
+      "requiredFiles": [
+        "src/app/(dashboard)/dashboard/console-log/page.js",
+        "src/diepxuan/app/dashboard/console-log/index.js",
+        "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/(dashboard)/dashboard/console-log/page.js",
+          "pattern": "@/diepxuan/app/dashboard/console-log"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/console-log/page.js",
+          "pattern": "<EnhancedConsoleLog\\s*/>"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/index.js",
+          "pattern": "EnhancedConsoleLog"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+          "pattern": "function EnhancedConsoleLog|export default function EnhancedConsoleLog"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "src/app/(dashboard)/dashboard/console-log/page.js",
+          "pattern": "<EnhancedConsoleLog\\s*/>"
+        }
+      ],
+      "syntaxCheck": [
+        "src/app/(dashboard)/dashboard/console-log/page.js",
+        "src/diepxuan/app/dashboard/console-log/index.js"
+      ]
+    },
+    {
+      "id": "web-tool-combo-fallback",
+      "description": "Web search/fetch fallback behavior for missing or unknown provider/model inputs.",
+      "requiredFiles": [
+        "src/sse/handlers/search.js",
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "getCombos"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "No provider/model specified"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "Unknown provider"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "handleComboChat"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "getCombos"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "No provider/model specified"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "Unknown provider"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "handleComboChat"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "getFirstWebCombo"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "getFallbackWebCombo"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "firstCombo"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "handleDiepXuanWebComboFallback\\(\\{"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "handleDiepXuanWebComboFallback\\(\\{"
+        }
+      ],
+      "syntaxCheck": [
+        "src/sse/handlers/search.js",
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
+      ]
+    },
+    {
+      "id": "combo-curl-dynamic-base-url",
+      "description": "Combo detail curl snippet uses current runtime origin instead of a hard-coded host.",
+      "requiredFiles": [
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "next.config.mjs"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+          "pattern": "baseUrl|window\\.location|headers"
+        }
+      ],
+      "syntaxCheck": [
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "next.config.mjs"
+      ]
+    },
+    {
+      "id": "cli-global-package",
+      "description": "CLI/global install custom packaging keeps dashboard app artifacts available for the @diepxuan/9router package.",
+      "requiredFiles": [
+        "cli/package.json",
+        "cli/cli.js",
+        "cli/hooks/postinstall.js",
+        ".npmignore",
+        "next.config.mjs"
+      ],
+      "requiredDirectories": [
+        "cli/src/cli"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "cli/package.json",
+          "pattern": "9router"
+        },
+        {
+          "file": "cli/cli.js",
+          "pattern": "9Router|9router"
+        },
+        {
+          "file": "cli/hooks/postinstall.js",
+          "pattern": "postinstall|install"
+        },
+        {
+          "file": ".npmignore",
+          "pattern": "next\\.config\\.mjs"
+        }
+      ],
+      "syntaxCheck": [
+        "cli/cli.js",
+        "cli/hooks/postinstall.js",
+        "cli/src/cli/api/client.js",
+        "cli/src/cli/menus/providers.js",
+        "cli/src/cli/menus/settings.js",
+        "cli/src/cli/terminalUI.js"
+      ]
+    },
+    {
+      "id": "antigravity-mitm-flow",
+      "description": "Dashboard/API MITM support for Antigravity custom flow.",
+      "requiredFiles": [
+        "src/app/api/cli-tools/antigravity-mitm/route.js",
+        "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js",
+        "src/mitm/manager.js",
+        "src/mitm/handlers/base.js",
+        "src/mitm/handlers/antigravity.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/api/cli-tools/antigravity-mitm/route.js",
+          "pattern": "antigravity|MITM|mitm"
+        },
+        {
+          "file": "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+          "pattern": "alias|antigravity|mitm"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js",
+          "pattern": "MITM|mitm|Antigravity"
+        },
+        {
+          "file": "src/mitm/manager.js",
+          "pattern": "MITM|mitm"
+        }
+      ],
+      "syntaxCheck": [
+        "src/app/api/cli-tools/antigravity-mitm/route.js",
+        "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+        "src/mitm/manager.js",
+        "src/mitm/handlers/base.js",
+        "src/mitm/handlers/antigravity.js"
+      ]
+    },
+    {
+      "id": "build-and-deploy-workflow",
+      "description": "Fork-only GitHub Actions workflow that patches, builds, versions, and publishes the CLI package as @diepxuan/9router to GitHub Packages.",
+      "requiredFiles": [
+        ".github/workflows/build-and-deploy.yml",
+        "Dockerfile",
+        "captain-definition",
+        "scripts/sync.sh",
+        ".npmignore",
+        "next.config.mjs"
+      ],
+      "requiredPatterns": [
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "branches: \\[main\\]"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "contents: write"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "packages: write"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "registry-url: \\\"https://npm\\.pkg\\.github\\.com\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm install"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg set name=\\\"@diepxuan/9router\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg set publishConfig\\.registry=\\\"https://npm\\.pkg\\.github\\.com/\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg delete scripts\\.prepublishOnly"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm run build"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm version patch --no-git-tag-version"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm version prerelease --preid=patch"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm publish"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "NODE_AUTH_TOKEN: \\${\\{ secrets\\.GITHUB_TOKEN \\}\\}"
+        },
+        {
+          "file": "scripts/sync.sh",
+          "pattern": "rsync -avP --delete 9router:~/.9router/ /var/lib/9router/"
+        }
+      ]
+    },
+    {
+      "id": "fork-branding-header",
+      "description": "Fork branding keeps upstream Header structure while removing Donate UI/modal. Note 2026-07-22: DonateModal.js may exist on disk (upstream added it back in v0.5.40 via commit ccb0842d); the fork only removes its import + UI from Header.",
+      "forbiddenPatterns": [
+        {
+          "file": "src/shared/components/Header.js",
+          "pattern": "DonateModal|volunteer_activism|Donate"
+        }
+      ],
+      "syntaxCheck": [
+        "src/shared/components/Header.js"
+      ]
+    },
+    {
+      "id": "workspace-governance-files",
+      "description": "Agent/workspace governance files carried by this fork.",
+      "requiredFiles": [
+        "AGENTS.md",
+        "AGENT_WORKSPACE.md",
+        "BOOTSTRAP.md",
+        "SOUL.md",
+        "IDENTITY.md",
+        "TOOLS.md",
+        "USER.md",
+        "HEARTBEAT.md",
+        "docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "AGENTS.md",
+          "pattern": "Boot Sequence|Git"
+        },
+        {
+          "file": "SOUL.md",
+          "pattern": "9Router Agent"
+        },
+        {
+          "file": "IDENTITY.md",
+          "pattern": "diepxuan/9router"
+        },
+        {
+          "file": "docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md",
+          "pattern": "Custom Features Merge Checklist"
+        }
+      ]
+    },
+    {
+      "id": "diepxuan-feature-flags",
+      "description": "Runtime feature flags DIEPXUAN_ENABLED/DIEPXUAN_SAFE_MODE gate the entire DiepXuan extension layer.",
+      "requiredFiles": [
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "DIEPXUAN_ENABLED"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "DIEPXUAN_SAFE_MODE"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "parseBool\\(process\\.env\\.DIEPXUAN_ENABLED, true\\)"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "isDiepXuanSafeMode"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "tests/unit/diepxuan-feature-flags.test.js",
+          "pattern": "enables DiepXuan hooks by default"
+        },
+        {
+          "file": "tests/unit/diepxuan-feature-flags.test.js",
+          "pattern": "skips a combo model after repeated failures"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "if \\(!isDiepXuanEnabled\\(\\)\\) return null"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "if \\(!isDiepXuanEnabled\\(\\)\\)"
+        }
+      ],
+      "syntaxCheck": [
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js"
+      ]
+    },
+    {
+      "id": "cli-tools-current-origin-endpoint",
+      "description": "CLI tool config snippets and settings prefer the current browser origin via a DiepXuan helper instead of hard-coded localhost/127.0.0.1.",
+      "requiredFiles": [
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getCurrentBrowserOrigin"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getToolDetailBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+          "pattern": "getToolDetailBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+          "pattern": "getCurrentBrowserOrigin"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        }
+      ],
+      "syntaxCheck": [
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js"
+      ]
+    },
+    {
+      "id": "codex-subagent-description",
+      "description": "Codex CLI generated config includes a DiepXuan-owned description for agents.subagent.",
+      "requiredFiles": [
+        "src/diepxuan/app/dashboard/cli-tools/codex.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+        "src/app/api/cli-tools/codex-settings/route.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/codex.js",
+          "pattern": "CODEX_SUBAGENT_DESCRIPTION"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/codex.js",
+          "pattern": "extendCodexSubagentConfig"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+          "pattern": "CODEX_SUBAGENT_DESCRIPTION"
+        },
+        {
+          "file": "src/app/api/cli-tools/codex-settings/route.js",
+          "pattern": "extendCodexSubagentConfig"
+        }
+      ],
+      "syntaxCheck": [
+        "src/diepxuan/app/dashboard/cli-tools/codex.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+        "src/app/api/cli-tools/codex-settings/route.js"
+      ]
+    },
+    {
+      "id": "diepxuan-root-dev-sh",
+      "description": "Root dev.sh is a DiepXuan-owned systemd/hosts helper for the internal development environment.",
+      "requiredFiles": [
+        "dev.sh"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "dev.sh",
+          "pattern": "9router\\.diepxuan\\.corp"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "9router-dev"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "HOSTS_MARKER"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "get_vm_ip"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "stop_prod_service"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "start_prod_service"
+        }
+      ]
+    },
+    {
+      "id": "auto-context-length",
+      "description": "Auto context length info: cache + provider API + error parser + enrich /v1/models response with context_length field.",
+      "requiredFiles": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getStaticContextLength"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "context_length"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "LIVE_MODEL_RESOLVERS"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/modelsApi.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/cache.js",
+          "pattern": "contextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/errorParser.js",
+          "pattern": "extractContextLengthFromError"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "context_length\\s*=\\s*contextLength"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js"
+      ]
+    }
+  ]
+}

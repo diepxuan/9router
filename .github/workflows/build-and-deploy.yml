@@ -1,0 +1,71 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          registry-url: "https://npm.pkg.github.com"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Next.js app
+        run: |
+          npm run build
+
+      - name: Build CLI with custom app
+        working-directory: cli
+        run: |
+          npm pkg set name="@diepxuan/9router"
+          npm pkg set publishConfig.registry="https://npm.pkg.github.com/"
+          npm pkg delete scripts.prepublishOnly || true
+
+          echo "=== CLI structure after patching ==="
+          cat package.json
+          tree -L 2 .
+          npm install --include=dev --ignore-scripts --no-package-lock --registry=https://registry.npmjs.org
+          node - <<'NODE'
+          const fs = require("fs");
+          const script = "scripts/build-cli.js";
+          const source = fs.readFileSync(script, "utf8");
+          const next = source.replace(
+            'NEXT_TRACING_ROOT_MODE: "workspace",',
+            'NEXT_TRACING_ROOT_MODE: process.env.NEXT_TRACING_ROOT_MODE || "workspace",'
+          );
+          if (next === source) {
+            throw new Error("Unable to patch NEXT_TRACING_ROOT_MODE for CLI build");
+          }
+          fs.writeFileSync(script, next);
+          NODE
+          NEXT_TRACING_ROOT_MODE=project npm run build
+
+      - name: Bump version before publish
+        working-directory: cli
+        run: |
+          TIMESTAMP=$(date +%s)
+          npm version patch --no-git-tag-version
+          npm version prerelease --preid=patch.$TIMESTAMP --no-git-tag-version
+
+      - name: Publish to GitHub Packages
+        working-directory: cli
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

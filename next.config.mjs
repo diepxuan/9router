@@ -14,6 +14,7 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   output: "standalone",
   serverExternalPackages: ["better-sqlite3", "sql.js", "node:sqlite", "bun:sqlite"],
+  allowedDevOrigins: ["10.0.0.122", "localhost", "9router.diepxuan.corp", "10.0.0.101"],
   turbopack: {
     root: tracingRoot
   },

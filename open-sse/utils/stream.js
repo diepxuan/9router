@@ -100,6 +100,9 @@ export function createSSEStream(options = {}) {
 
         // Passthrough mode: normalize and forward
         if (mode === STREAM_MODE.PASSTHROUGH) {
+          // Strip SSE comment lines (e.g. NVIDIA telemetry `: {...}`)
+          // if (trimmed && !trimmed.startsWith("data:")) continue;
+
           let output;
           let injectedUsage = false;
 
