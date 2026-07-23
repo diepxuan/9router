@@ -522,7 +522,7 @@ Toàn bộ hook DiepXuan (combo fail tracker, web fallback, executor NVIDIA stri
 | `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx` | **không wrap** (always-on: thay thế hoàn toàn base component, wrap = mất feature) |
 | `src/app/api/v1/models/route.js` (NVIDIA resolver + context_length) | có (qua wrapper trong `open-sse/diepxuan/contextLength/*`) |
 | `open-sse/diepxuan/contextLength/index.js` | có (2026-07-22) |
-| `open-sse/diepxuan/contextLength/cache.js` | có (2026-07-22) |
+| `open-sse/diepxuan/contextLength/cache.js` | có (2026-07-22; fix import 2026-07-23 — xem mục 13) |
 | `open-sse/diepxuan/contextLength/modelsApi.js` | có (2026-07-22) |
 | `open-sse/diepxuan/contextLength/errorParser.js` | có (2026-07-22) |
 
@@ -623,6 +623,14 @@ Tự động thu thập và cập nhật `context_length` (max tokens) cho mọi
 1. **Provider `/v1/models` API** — 1 call / 24h, cache vào SQLite
 2. **Parse 400 error** — Học từ lỗi `maximum context length is X tokens`
 3. **MODEL_INFO static** — Fallback cuối cùng
+
+### Bug fix 2026-07-23: thiếu import `isDiepXuanEnabled` trong `cache.js`
+
+- **Triệu chứng:** log dev bắn liên tục (mỗi ~1s) `Error fetching models: ReferenceError: isDiepXuanEnabled is not defined` mỗi khi provider fetch model (đi qua `resolveProviderModelsWithContext` → `upsertContextLength`).
+- **Nguyên nhân:** `open-sse/diepxuan/contextLength/cache.js` gọi `isDiepXuanEnabled()` trong `upsertContextLength()` nhưng **quên import**. Bảng ở mục 11 ghi file này "có guard" từ 2026-07-22, nhưng guard ném ReferenceError vì thiếu import (guard chỉ thật sự hoạt động sau fix này).
+- **Fix:** thêm `import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";` — cùng đường dẫn với các module anh em (`modelsApi.js`, `errorParser.js`, `index.js`).
+- **Bài học (tránh lặp lại):** khi thêm guard `isDiepXuanEnabled()` vào file fork layer mới, luôn kiểm tra dòng import đi kèm; `node --check` không bắt được lỗi này (biến undefined chỉ ném lúc runtime).
+- **Verify:** `node --check` PASS; gọi `/api/models` + `/api/v1/models` → 200; log 0 lỗi `isDiepXuanEnabled` (trước đó bắn mỗi giây).
 
 ### Files cần giữ (fork layer)
 
@@ -930,3 +938,175 @@ node --check open-sse/diepxuan/contextLength/errorParser.js
 curl -sS http://localhost:20128/api/v1/models | jq '.data[] | select(.id | contains("nvidia")) | {id, context_length}'
 # → phải có context_length cho model NVIDIA
 ```
+
+---
+
+## 19. Agnes AI provider (fork-layer registry) — 2026-07-23
+
+### Mục đích
+
+Bổ sung provider **Agnes AI** (Sapiens AI) — gateway đa phương thức, OpenAI-compatible.
+Docs: https://agnes-ai.com/en/docs/overview
+
+- Base URL: `https://apihub.agnes-ai.com/v1`
+- Auth: `Authorization: Bearer <API_KEY>` (apikey thuần, không OAuth)
+- Chat: `POST /v1/chat/completions`; Image: `POST /v1/images/generations`; validate qua `GET /v1/models`
+
+### Model — đã test live (2026-07-23, qua GET /v1/models + gọi thật)
+
+| Model | Kind | Kết quả test | Trạng thái |
+|-------|------|--------------|-----------|
+| `agnes-2.0-flash` | llm (text/vision) | `POST /v1/chat/completions` → 200 OK | **Bật** |
+| `agnes-image-2.0-flash` | image | `POST /v1/images/generations` → 200 OK (trả URL) | **Bật** |
+| `agnes-image-2.1-flash` | image | có trong `/v1/models` live | **Bật** |
+| `agnes-1.5-flash` | llm | `503 model_not_found` (No available channel) | **Bỏ** (chưa mở dù MODEL_CATALOG có ghi) |
+| `agnes-video-v2.0` | video | `POST /v1/videos` async + poll `video_id` | **Hoãn** (shape khác `videoCore`, cần executor riêng) |
+
+> **Bài học:** MODEL_CATALOG.md của Agnes liệt kê `agnes-1.5-flash` nhưng endpoint trả 503.
+> Luôn xác thực bằng `GET /v1/models` + 1 call thật trước khi đưa model vào registry.
+
+### Quyết định kiến trúc (hướng 2)
+
+Provider chuẩn của 9Router nằm ở base dir `open-sse/providers/registry/` và REGISTRY được import
+trực tiếp bởi nhiều consumer (`providers/index.js`, `src/shared/constants/providers*.js`, `services/model.js`...).
+Không có chokepoint nào ở layer fork để tiêm provider mà không đụng base.
+
+Thỏa hiệp gần luật fork (AGENTS §6) nhất: **logic provider nằm ở layer fork**, chỉ chạm các
+điểm hợp nhất bắt buộc ở base bằng thay đổi tối thiểu (1 dòng mỗi điểm).
+
+### Files cần giữ (fork layer)
+
+```
+open-sse/diepxuan/registry/agnes.js   -- registry entry (chat transport + image imageConfig + models)
+public/providers/agnes.png            -- provider icon 128x128 (logo mark chinh thuc, tach tu platform favicon.ico)
+```
+
+### Injection points (base files — bắt buộc, tối thiểu)
+
+| Base file | Thay đổi |
+|-----------|----------|
+| `open-sse/providers/registry/index.js` | Thêm `import d1 from "../../diepxuan/registry/agnes.js";` (namespace `dN` cho fork, tránh renumber `pN` của upstream khi rebase) + append `d1` vào cuối mảng `export default [...]` |
+| `open-sse/handlers/imageProviders/index.js` | Thêm `agnes: createOpenAIAdapter("agnes"),` vào map `ADAPTERS` (image dùng adapter OpenAI-compatible generic, đọc `imageConfig.baseUrl` từ registry) |
+
+> **Lý do dùng `d1` thay vì `p100`:** dải `pN` do upstream tự sinh và đánh số lại toàn bộ mỗi khi thêm provider.
+> Dùng namespace riêng `dN` cho các entry fork để append thêm không rơi vào vùng bị renumber → giảm conflict khi rebase.
+
+### Checklist khi rebase upstream
+
+```bash
+# File fork còn nguyên
+test -f open-sse/diepxuan/registry/agnes.js
+test -f public/providers/agnes.png
+
+# Injection points còn nguyên
+grep -q 'import d1 from "../../diepxuan/registry/agnes.js"' open-sse/providers/registry/index.js
+grep -qE '^\s*d1,' open-sse/providers/registry/index.js
+grep -q 'agnes: createOpenAIAdapter("agnes")' open-sse/handlers/imageProviders/index.js
+
+# Syntax
+node --check open-sse/diepxuan/registry/agnes.js
+node --check open-sse/providers/registry/index.js
+node --check open-sse/handlers/imageProviders/index.js
+```
+
+### Smoke test
+
+```bash
+# REGISTRY + downstream build
+node --input-type=module -e '
+import R from "./open-sse/providers/registry/index.js";
+import { PROVIDERS, PROVIDER_MODELS, PROVIDER_MEDIA } from "./open-sse/providers/index.js";
+console.log("has agnes:", R.some(r=>r.id==="agnes"));
+console.log("chat:", PROVIDERS.agnes?.baseUrl);
+console.log("models:", PROVIDER_MODELS.agnes?.map(m=>m.id));
+console.log("image:", PROVIDER_MEDIA.agnes?.imageConfig?.baseUrl);
+'
+# → has agnes: true
+#   chat: https://apihub.agnes-ai.com/v1/chat/completions
+#   models: [agnes-2.0-flash, agnes-image-2.0-flash, agnes-image-2.1-flash]
+#   image: https://apihub.agnes-ai.com/v1/images/generations
+
+# Gọi thật (thay <KEY>)
+curl -s https://apihub.agnes-ai.com/v1/chat/completions -H "Authorization: Bearer <KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"agnes-2.0-flash","messages":[{"role":"user","content":"Say OK"}],"max_tokens":16}'
+```
+
+### Verify đã chạy (2026-07-23)
+
+- REGISTRY length 100 → 101, `has agnes: true`, không trùng id/alias.
+- `PROVIDERS.agnes` + `PROVIDER_MODELS.agnes` (3 model) + `PROVIDER_MEDIA.agnes.imageConfig` build đúng (`format:"openai"` mặc định).
+- `node --check` PASS cho cả 3 file.
+- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
+- Gọi thật: `agnes-2.0-flash` → 200 "OK"; `agnes-image-2.0-flash` → 200 (trả URL ảnh).
+
+## 20. i18n — dịch phần giải thích Combos + Round Robin label sang tiếng Việt — 2026-07-23 (rev 2)
+
+### Mục đích
+
+Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/page.js`) đang hiển thị tiếng Anh (do base upstream). Khi user chọn locale `vi`, runtime i18n sẽ tự thay thế sang tiếng Việt thông qua JSON literal map.
+
+Đợt rev 2 (2026-07-23) — Sếp yêu cầu chuẩn hóa:
+- "Round Robin" không dịch thành "Vòng tròn" (nghĩa đen literal, không đúng kỹ thuật) → phải dùng "Luân phiên" (thuật ngữ chuẩn trong load balancing / scheduling).
+- Bổ sung key cho `STRATEGY_OPTIONS` trong modal (3 label nhỏ).
+
+### Cơ chế
+
+1. Runtime i18n quét DOM (MutationObserver).
+2. Đối chiếu text node với key trong `public/i18n/literals/{locale}.json`.
+3. Có key → thay thế; không có → giữ nguyên tiếng Anh (fallback).
+
+### Quyết định dịch thuật (rev 2)
+
+| English key | Vietnamese value | Bối cảnh |
+|------------|-----------------|-----------|
+| `Round Robin` | `Luân phiên` | Bullet list Combos + label `ConnectionsCard.js` (round-robin load balancing — chuẩn kỹ thuật) |
+| `Round Robin — rotates models across requests to spread load` | `Luân phiên — xoay vòng model giữa các request để phân tải` | Bullet giải thích combo strategy |
+| `Round Robin — rotate` | `Luân phiên — xoay vòng` | `STRATEGY_OPTIONS` trong modal tạo/edit combo |
+| `Fallback — try in order` | `Fallback — thử theo thứ tự` | `STRATEGY_OPTIONS` trong modal |
+| `Fusion — panel + judge` | `Fusion — panel + judge` | `STRATEGY_OPTIONS` trong modal (giữ thuật ngữ Anh "panel" + "judge") |
+| `Group models under one name, then pick a strategy per combo:` | `Gom các model dưới một tên, rồi chọn chiến lược cho mỗi combo:` | Header giải thích |
+| `Fallback — tries models in order (next on failure)` | `Fallback — thử các model theo thứ tự (model tiếp theo khi lỗi)` | Bullet Fallback |
+| `Fusion — queries all models in parallel, then a judge synthesizes one answer. Best quality, but costs the most: every request bills all panel models + the judge (N+1 calls)` | `Fusion — truy vấn tất cả model song song, sau đó một judge tổng hợp thành một câu trả lời. Chất lượng cao nhất nhưng tốn kém nhất: mỗi request tính phí tất cả panel models + judge (N+1 calls)` | Bullet Fusion (giữ "panel", "judge", "N+1 calls" vì là thuật ngữ) |
+| `Capacity auto-switch — sends image/PDF/audio requests to a model that supports them first` | `Capacity auto-switch — gửi request hình ảnh/PDF/audio đến model hỗ trợ trước` | Bullet Capacity auto-switch |
+
+### Fork layer files (xem §13)
+
+- `public/i18n/literals/vi.json` — chỉnh sửa key `Round Robin` (value cũ "Vòng tròn" → "Luân phiên"), cập nhật value key long-form, thêm 3 key mới cho STRATEGY_OPTIONS. Tổng: 198 → 201 keys.
+
+### Base file bị sửa
+
+- **Không có.** Chỉ đụng JSON literal, không sửa UI source → không có merge conflict khi rebase upstream.
+
+### File phụ thuộc (base, không sửa)
+
+- `src/app/(dashboard)/dashboard/combos/page.js` — dùng key `Round Robin` (line 155) + `Round Robin — rotates...` (line 155) + `Round Robin — rotate` (line 235).
+- `src/app/(dashboard)/dashboard/providers/components/ConnectionsCard.js` line 407 — dùng key `Round Robin`.
+
+### Checklist sau merge upstream
+
+- [ ] Không cần làm gì nếu upstream không sửa text trong 2 file trên.
+- [ ] Nếu upstream sửa text → cập nhật lại key tương ứng trong `vi.json` (key cũ có thể trở thành dead keys, an toàn).
+
+### Smoke test khuyến nghị
+
+1. Mở Dashboard, chuyển locale sang "Tiếng Việt 🇻🇳".
+2. Vào page Combos:
+   - Phần mô tả "Gom các model..." thay vì "Group models..." ✓
+   - 4 bullet: "Fallback" / "Luân phiên" / "Fusion" / "Capacity auto-switch" ✓
+3. Vào Create Combo (modal):
+   - Dropdown chọn strategy hiển thị: `Fallback — thử theo thứ tự`, `Luân phiên — xoay vòng`, `Fusion — panel + judge` ✓
+4. Vào page Providers → Connections → bullet "Luân phiên" (mult-account) ✓
+5. Chuyển lại locale "English 🇺🇸" → text gốc tiếng Anh hiển thị đầy đủ.
+
+### Verify đã chạy (2026-07-23, rev 2)
+
+- `python3 -m json.tool public/i18n/literals/vi.json`: JSON hợp lệ.
+- 201 keys, không trùng lặp.
+- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
+- Tất cả key match exact với text trong base file (kể cả em-dash `—`).
+
+### Lịch sử
+
+- rev 1 (PR #50 commit `9aedad6c`): thêm 5 keys ban đầu, dùng "Round Robin" trong value.
+- rev 2 (sửa tiếp PR #50 hoặc PR mới): chuẩn hóa "Round Robin" key → "Luân phiên", thêm 3 keys cho STRATEGY_OPTIONS modal. Theo Sếp yêu cầu trực tiếp.

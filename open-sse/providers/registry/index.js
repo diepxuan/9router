@@ -100,6 +100,9 @@ import p97 from "./xiaomi-tokenplan.js";
 import p98 from "./youcom.js";
 import p99 from "./alims-intl.js";
 
+// DiepXuan fork-layer providers (namespace dN to avoid upstream pN renumber conflicts)
+import d1 from "../../diepxuan/registry/agnes.js";
+
 export default [
   p0,
   p1,
@@ -201,4 +204,5 @@ export default [
   p97,
   p98,
   p99,
+  d1,
 ];
