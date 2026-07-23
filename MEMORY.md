@@ -69,3 +69,17 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 ---
 
 *MEMORY.md được cập nhật bởi MAIN SESSION. Các session thông thường không đọc/ghi file này.*
+
+## 6. Cập nhật gần đây
+
+| Ngày | Sự kiện |
+|------|---------|
+| 2026-07-23 | PR #46 (fork DiepXuan → main), PR #51 (i18n vi combos + RR label) merged |
+| 2026-07-23 | Round Robin: key "Vòng tròn" → "Luân phiên" (chuẩn kỹ thuật) theo yêu cầu Sếp |
+| 2026-07-23 | vi.json: 196 → 201 keys, không sửa base file (runtime i18n) |
+| 2026-07-22 | PR #46 batch 2: drop dead code + wrap hooks + sync docs |
+| 2026-07-21 | Tách SOUL/IDENTITY/USER/TOOLS single source of truth (PR #44) |
+
+### Phiên bản sau merge
+- main: v0.5.40 + fork layer (commit 1464cd94)
+- diepxuan: v0.5.40 + 12 fork commits
