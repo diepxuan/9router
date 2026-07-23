@@ -136,7 +136,7 @@
   "Password updated successfully": "Đã cập nhật mật khẩu thành công",
   "Passwords do not match": "Mật khẩu không khớp",
   "Routing Strategy": "Chiến lược định tuyến",
-  "Round Robin": "Vòng tròn",
+  "Round Robin": "Luân phiên",
   "Cycle through accounts to distribute load": "Luân phiên qua các tài khoản để phân phối tải",
   "Sticky Limit": "Giới hạn dính",
   "Calls per account before switching": "Số lần gọi mỗi tài khoản trước khi chuyển",
@@ -194,7 +194,10 @@
   "Endpoint is exposed without an API key.": "Endpoint đang mở mà không có API key.",
   "Group models under one name, then pick a strategy per combo:": "Gom các model dưới một tên, rồi chọn chiến lược cho mỗi combo:",
   "Fallback — tries models in order (next on failure)": "Fallback — thử các model theo thứ tự (model tiếp theo khi lỗi)",
-  "Round Robin — rotates models across requests to spread load": "Round Robin — luân phiên model qua các request để phân tải",
+  "Round Robin — rotates models across requests to spread load": "Luân phiên — xoay vòng model giữa các request để phân tải",
   "Fusion — queries all models in parallel, then a judge synthesizes one answer. Best quality, but costs the most: every request bills all panel models + the judge (N+1 calls)": "Fusion — truy vấn tất cả model song song, sau đó một judge tổng hợp thành một câu trả lời. Chất lượng cao nhất nhưng tốn kém nhất: mỗi request tính phí tất cả panel models + judge (N+1 calls)",
-  "Capacity auto-switch — sends image/PDF/audio requests to a model that supports them first": "Capacity auto-switch — gửi request hình ảnh/PDF/audio đến model hỗ trợ trước"
+  "Capacity auto-switch — sends image/PDF/audio requests to a model that supports them first": "Capacity auto-switch — gửi request hình ảnh/PDF/audio đến model hỗ trợ trước",
+  "Round Robin — rotate": "Luân phiên — xoay vòng",
+  "Fallback — try in order": "Fallback — thử theo thứ tự",
+  "Fusion — panel + judge": "Fusion — panel + judge"
 }
