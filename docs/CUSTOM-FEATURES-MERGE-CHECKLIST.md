@@ -1040,11 +1040,15 @@ curl -s https://apihub.agnes-ai.com/v1/chat/completions -H "Authorization: Beare
 - `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
 - Gọi thật: `agnes-2.0-flash` → 200 "OK"; `agnes-image-2.0-flash` → 200 (trả URL ảnh).
 
-## 20. i18n — dịch phần giải thích Combos sang tiếng Việt — 2026-07-23
+## 20. i18n — dịch phần giải thích Combos + Round Robin label sang tiếng Việt — 2026-07-23 (rev 2)
 
 ### Mục đích
 
 Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/page.js`) đang hiển thị tiếng Anh (do base upstream). Khi user chọn locale `vi`, runtime i18n sẽ tự thay thế sang tiếng Việt thông qua JSON literal map.
+
+Đợt rev 2 (2026-07-23) — Sếp yêu cầu chuẩn hóa:
+- "Round Robin" không dịch thành "Vòng tròn" (nghĩa đen literal, không đúng kỹ thuật) → phải dùng "Luân phiên" (thuật ngữ chuẩn trong load balancing / scheduling).
+- Bổ sung key cho `STRATEGY_OPTIONS` trong modal (3 label nhỏ).
 
 ### Cơ chế
 
@@ -1052,28 +1056,57 @@ Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/
 2. Đối chiếu text node với key trong `public/i18n/literals/{locale}.json`.
 3. Có key → thay thế; không có → giữ nguyên tiếng Anh (fallback).
 
+### Quyết định dịch thuật (rev 2)
+
+| English key | Vietnamese value | Bối cảnh |
+|------------|-----------------|-----------|
+| `Round Robin` | `Luân phiên` | Bullet list Combos + label `ConnectionsCard.js` (round-robin load balancing — chuẩn kỹ thuật) |
+| `Round Robin — rotates models across requests to spread load` | `Luân phiên — xoay vòng model giữa các request để phân tải` | Bullet giải thích combo strategy |
+| `Round Robin — rotate` | `Luân phiên — xoay vòng` | `STRATEGY_OPTIONS` trong modal tạo/edit combo |
+| `Fallback — try in order` | `Fallback — thử theo thứ tự` | `STRATEGY_OPTIONS` trong modal |
+| `Fusion — panel + judge` | `Fusion — panel + judge` | `STRATEGY_OPTIONS` trong modal (giữ thuật ngữ Anh "panel" + "judge") |
+| `Group models under one name, then pick a strategy per combo:` | `Gom các model dưới một tên, rồi chọn chiến lược cho mỗi combo:` | Header giải thích |
+| `Fallback — tries models in order (next on failure)` | `Fallback — thử các model theo thứ tự (model tiếp theo khi lỗi)` | Bullet Fallback |
+| `Fusion — queries all models in parallel, then a judge synthesizes one answer. Best quality, but costs the most: every request bills all panel models + the judge (N+1 calls)` | `Fusion — truy vấn tất cả model song song, sau đó một judge tổng hợp thành một câu trả lời. Chất lượng cao nhất nhưng tốn kém nhất: mỗi request tính phí tất cả panel models + judge (N+1 calls)` | Bullet Fusion (giữ "panel", "judge", "N+1 calls" vì là thuật ngữ) |
+| `Capacity auto-switch — sends image/PDF/audio requests to a model that supports them first` | `Capacity auto-switch — gửi request hình ảnh/PDF/audio đến model hỗ trợ trước` | Bullet Capacity auto-switch |
+
 ### Fork layer files (xem §13)
 
-- `public/i18n/literals/vi.json` — thêm 5 key mới (Group models..., Fallback..., Round Robin..., Fusion..., Capacity auto-switch...).
+- `public/i18n/literals/vi.json` — chỉnh sửa key `Round Robin` (value cũ "Vòng tròn" → "Luân phiên"), cập nhật value key long-form, thêm 3 key mới cho STRATEGY_OPTIONS. Tổng: 198 → 201 keys.
 
 ### Base file bị sửa
 
-- **Không có.** Bài này chỉ thêm JSON literal, không sửa UI source → không có merge conflict khi rebase upstream.
+- **Không có.** Chỉ đụng JSON literal, không sửa UI source → không có merge conflict khi rebase upstream.
+
+### File phụ thuộc (base, không sửa)
+
+- `src/app/(dashboard)/dashboard/combos/page.js` — dùng key `Round Robin` (line 155) + `Round Robin — rotates...` (line 155) + `Round Robin — rotate` (line 235).
+- `src/app/(dashboard)/dashboard/providers/components/ConnectionsCard.js` line 407 — dùng key `Round Robin`.
 
 ### Checklist sau merge upstream
 
-- [ ] Không cần làm gì — file JSON literal nằm hoàn toàn trong fork layer.
-- [ ] Nếu upstream sửa base file `combos/page.js` và text giải thích thay đổi → cần cập nhật lại key trong `vi.json` (cũ có thể trở thành dead keys, an toàn).
+- [ ] Không cần làm gì nếu upstream không sửa text trong 2 file trên.
+- [ ] Nếu upstream sửa text → cập nhật lại key tương ứng trong `vi.json` (key cũ có thể trở thành dead keys, an toàn).
 
 ### Smoke test khuyến nghị
 
 1. Mở Dashboard, chuyển locale sang "Tiếng Việt 🇻🇳".
-2. Vào page Combos → phần mô tả và 4 bullet (Fallback / Round Robin / Fusion / Capacity auto-switch) phải hiển thị tiếng Việt.
-3. Chuyển lại locale "English 🇺🇸" → text gốc tiếng Anh vẫn hiển thị đầy đủ.
+2. Vào page Combos:
+   - Phần mô tả "Gom các model..." thay vì "Group models..." ✓
+   - 4 bullet: "Fallback" / "Luân phiên" / "Fusion" / "Capacity auto-switch" ✓
+3. Vào Create Combo (modal):
+   - Dropdown chọn strategy hiển thị: `Fallback — thử theo thứ tự`, `Luân phiên — xoay vòng`, `Fusion — panel + judge` ✓
+4. Vào page Providers → Connections → bullet "Luân phiên" (mult-account) ✓
+5. Chuyển lại locale "English 🇺🇸" → text gốc tiếng Anh hiển thị đầy đủ.
 
-### Verify đã chạy (2026-07-23)
+### Verify đã chạy (2026-07-23, rev 2)
 
-- `python3 -m json.tool public/i18n/literals/vi.json` → JSON hợp lệ.
-- 5/5 key mới có mặt trong file, exact match với text trong base file.
-- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL (không ảnh hưởng custom features khác).
-- Key mới dùng `em-dash (—)` đúng như text gốc trong source — runtime i18n khớp exact key.
+- `python3 -m json.tool public/i18n/literals/vi.json`: JSON hợp lệ.
+- 201 keys, không trùng lặp.
+- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
+- Tất cả key match exact với text trong base file (kể cả em-dash `—`).
+
+### Lịch sử
+
+- rev 1 (PR #50 commit `9aedad6c`): thêm 5 keys ban đầu, dùng "Round Robin" trong value.
+- rev 2 (sửa tiếp PR #50 hoặc PR mới): chuẩn hóa "Round Robin" key → "Luân phiên", thêm 3 keys cho STRATEGY_OPTIONS modal. Theo Sếp yêu cầu trực tiếp.
