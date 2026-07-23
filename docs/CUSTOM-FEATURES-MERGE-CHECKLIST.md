@@ -1039,3 +1039,41 @@ curl -s https://apihub.agnes-ai.com/v1/chat/completions -H "Authorization: Beare
 - `node --check` PASS cho cả 3 file.
 - `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
 - Gọi thật: `agnes-2.0-flash` → 200 "OK"; `agnes-image-2.0-flash` → 200 (trả URL ảnh).
+
+## 20. i18n — dịch phần giải thích Combos sang tiếng Việt — 2026-07-23
+
+### Mục đích
+
+Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/page.js`) đang hiển thị tiếng Anh (do base upstream). Khi user chọn locale `vi`, runtime i18n sẽ tự thay thế sang tiếng Việt thông qua JSON literal map.
+
+### Cơ chế
+
+1. Runtime i18n quét DOM (MutationObserver).
+2. Đối chiếu text node với key trong `public/i18n/literals/{locale}.json`.
+3. Có key → thay thế; không có → giữ nguyên tiếng Anh (fallback).
+
+### Fork layer files (xem §13)
+
+- `public/i18n/literals/vi.json` — thêm 5 key mới (Group models..., Fallback..., Round Robin..., Fusion..., Capacity auto-switch...).
+
+### Base file bị sửa
+
+- **Không có.** Bài này chỉ thêm JSON literal, không sửa UI source → không có merge conflict khi rebase upstream.
+
+### Checklist sau merge upstream
+
+- [ ] Không cần làm gì — file JSON literal nằm hoàn toàn trong fork layer.
+- [ ] Nếu upstream sửa base file `combos/page.js` và text giải thích thay đổi → cần cập nhật lại key trong `vi.json` (cũ có thể trở thành dead keys, an toàn).
+
+### Smoke test khuyến nghị
+
+1. Mở Dashboard, chuyển locale sang "Tiếng Việt 🇻🇳".
+2. Vào page Combos → phần mô tả và 4 bullet (Fallback / Round Robin / Fusion / Capacity auto-switch) phải hiển thị tiếng Việt.
+3. Chuyển lại locale "English 🇺🇸" → text gốc tiếng Anh vẫn hiển thị đầy đủ.
+
+### Verify đã chạy (2026-07-23)
+
+- `python3 -m json.tool public/i18n/literals/vi.json` → JSON hợp lệ.
+- 5/5 key mới có mặt trong file, exact match với text trong base file.
+- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL (không ảnh hưởng custom features khác).
+- Key mới dùng `em-dash (—)` đúng như text gốc trong source — runtime i18n khớp exact key.
