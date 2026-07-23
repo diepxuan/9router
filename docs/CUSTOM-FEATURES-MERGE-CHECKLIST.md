@@ -938,3 +938,104 @@ node --check open-sse/diepxuan/contextLength/errorParser.js
 curl -sS http://localhost:20128/api/v1/models | jq '.data[] | select(.id | contains("nvidia")) | {id, context_length}'
 # → phải có context_length cho model NVIDIA
 ```
+
+---
+
+## 19. Agnes AI provider (fork-layer registry) — 2026-07-23
+
+### Mục đích
+
+Bổ sung provider **Agnes AI** (Sapiens AI) — gateway đa phương thức, OpenAI-compatible.
+Docs: https://agnes-ai.com/en/docs/overview
+
+- Base URL: `https://apihub.agnes-ai.com/v1`
+- Auth: `Authorization: Bearer <API_KEY>` (apikey thuần, không OAuth)
+- Chat: `POST /v1/chat/completions`; Image: `POST /v1/images/generations`; validate qua `GET /v1/models`
+
+### Model — đã test live (2026-07-23, qua GET /v1/models + gọi thật)
+
+| Model | Kind | Kết quả test | Trạng thái |
+|-------|------|--------------|-----------|
+| `agnes-2.0-flash` | llm (text/vision) | `POST /v1/chat/completions` → 200 OK | **Bật** |
+| `agnes-image-2.0-flash` | image | `POST /v1/images/generations` → 200 OK (trả URL) | **Bật** |
+| `agnes-image-2.1-flash` | image | có trong `/v1/models` live | **Bật** |
+| `agnes-1.5-flash` | llm | `503 model_not_found` (No available channel) | **Bỏ** (chưa mở dù MODEL_CATALOG có ghi) |
+| `agnes-video-v2.0` | video | `POST /v1/videos` async + poll `video_id` | **Hoãn** (shape khác `videoCore`, cần executor riêng) |
+
+> **Bài học:** MODEL_CATALOG.md của Agnes liệt kê `agnes-1.5-flash` nhưng endpoint trả 503.
+> Luôn xác thực bằng `GET /v1/models` + 1 call thật trước khi đưa model vào registry.
+
+### Quyết định kiến trúc (hướng 2)
+
+Provider chuẩn của 9Router nằm ở base dir `open-sse/providers/registry/` và REGISTRY được import
+trực tiếp bởi nhiều consumer (`providers/index.js`, `src/shared/constants/providers*.js`, `services/model.js`...).
+Không có chokepoint nào ở layer fork để tiêm provider mà không đụng base.
+
+Thỏa hiệp gần luật fork (AGENTS §6) nhất: **logic provider nằm ở layer fork**, chỉ chạm các
+điểm hợp nhất bắt buộc ở base bằng thay đổi tối thiểu (1 dòng mỗi điểm).
+
+### Files cần giữ (fork layer)
+
+```
+open-sse/diepxuan/registry/agnes.js   -- registry entry (chat transport + image imageConfig + models)
+public/providers/agnes.png            -- provider icon 128x128 (logo mark chinh thuc, tach tu platform favicon.ico)
+```
+
+### Injection points (base files — bắt buộc, tối thiểu)
+
+| Base file | Thay đổi |
+|-----------|----------|
+| `open-sse/providers/registry/index.js` | Thêm `import d1 from "../../diepxuan/registry/agnes.js";` (namespace `dN` cho fork, tránh renumber `pN` của upstream khi rebase) + append `d1` vào cuối mảng `export default [...]` |
+| `open-sse/handlers/imageProviders/index.js` | Thêm `agnes: createOpenAIAdapter("agnes"),` vào map `ADAPTERS` (image dùng adapter OpenAI-compatible generic, đọc `imageConfig.baseUrl` từ registry) |
+
+> **Lý do dùng `d1` thay vì `p100`:** dải `pN` do upstream tự sinh và đánh số lại toàn bộ mỗi khi thêm provider.
+> Dùng namespace riêng `dN` cho các entry fork để append thêm không rơi vào vùng bị renumber → giảm conflict khi rebase.
+
+### Checklist khi rebase upstream
+
+```bash
+# File fork còn nguyên
+test -f open-sse/diepxuan/registry/agnes.js
+test -f public/providers/agnes.png
+
+# Injection points còn nguyên
+grep -q 'import d1 from "../../diepxuan/registry/agnes.js"' open-sse/providers/registry/index.js
+grep -qE '^\s*d1,' open-sse/providers/registry/index.js
+grep -q 'agnes: createOpenAIAdapter("agnes")' open-sse/handlers/imageProviders/index.js
+
+# Syntax
+node --check open-sse/diepxuan/registry/agnes.js
+node --check open-sse/providers/registry/index.js
+node --check open-sse/handlers/imageProviders/index.js
+```
+
+### Smoke test
+
+```bash
+# REGISTRY + downstream build
+node --input-type=module -e '
+import R from "./open-sse/providers/registry/index.js";
+import { PROVIDERS, PROVIDER_MODELS, PROVIDER_MEDIA } from "./open-sse/providers/index.js";
+console.log("has agnes:", R.some(r=>r.id==="agnes"));
+console.log("chat:", PROVIDERS.agnes?.baseUrl);
+console.log("models:", PROVIDER_MODELS.agnes?.map(m=>m.id));
+console.log("image:", PROVIDER_MEDIA.agnes?.imageConfig?.baseUrl);
+'
+# → has agnes: true
+#   chat: https://apihub.agnes-ai.com/v1/chat/completions
+#   models: [agnes-2.0-flash, agnes-image-2.0-flash, agnes-image-2.1-flash]
+#   image: https://apihub.agnes-ai.com/v1/images/generations
+
+# Gọi thật (thay <KEY>)
+curl -s https://apihub.agnes-ai.com/v1/chat/completions -H "Authorization: Bearer <KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"agnes-2.0-flash","messages":[{"role":"user","content":"Say OK"}],"max_tokens":16}'
+```
+
+### Verify đã chạy (2026-07-23)
+
+- REGISTRY length 100 → 101, `has agnes: true`, không trùng id/alias.
+- `PROVIDERS.agnes` + `PROVIDER_MODELS.agnes` (3 model) + `PROVIDER_MEDIA.agnes.imageConfig` build đúng (`format:"openai"` mặc định).
+- `node --check` PASS cho cả 3 file.
+- `node scripts/diepxuan/check-custom-features.mjs`: 360 PASS / 0 WARN / 0 FAIL.
+- Gọi thật: `agnes-2.0-flash` → 200 "OK"; `agnes-image-2.0-flash` → 200 (trả URL ảnh).
