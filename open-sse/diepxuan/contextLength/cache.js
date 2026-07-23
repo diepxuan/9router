@@ -9,6 +9,7 @@
 
 import Database from "better-sqlite3";
 import { ensureDirs, DATA_FILE } from "@/lib/db/paths.js";
+import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 
 const SOURCE_API = "api";
 const SOURCE_ERROR = "error";
