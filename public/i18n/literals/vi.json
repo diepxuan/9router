@@ -191,5 +191,10 @@
   "Click to add, click again to remove. Changes are saved automatically.": "Nhấp để thêm, nhấp lại để xóa. Thay đổi được lưu tự động.",
   "⚠️ Risk Notice: This provider uses a subscription/OAuth session not officially licensed for proxy/router use. Account may be restricted or banned. Use at your own risk.": "⚠️ Cảnh báo rủi ro: Provider này sử dụng subscription/OAuth không được cấp phép chính thức cho mục đích proxy/router. Tài khoản có thể bị hạn chế hoặc cấm. Người dùng tự chịu trách nhiệm.",
   "⚠️ MITM intercepts HTTPS traffic of IDE tools (Antigravity, GitHub Copilot, Kiro) via local CA to redirect requests to your providers. May violate ToS → account ban. Use at your own risk.": "⚠️ MITM chặn lưu lượng HTTPS của các IDE tools (Antigravity, GitHub Copilot, Kiro) qua CA cục bộ để chuyển hướng request đến providers của bạn. Có thể vi phạm ToS → rủi ro bị ban tài khoản. Sử dụng với rủi ro của bạn.",
-  "Endpoint is exposed without an API key.": "Endpoint đang mở mà không có API key."
+  "Endpoint is exposed without an API key.": "Endpoint đang mở mà không có API key.",
+  "Group models under one name, then pick a strategy per combo:": "Gom các model dưới một tên, rồi chọn chiến lược cho mỗi combo:",
+  "Fallback — tries models in order (next on failure)": "Fallback — thử các model theo thứ tự (model tiếp theo khi lỗi)",
+  "Round Robin — rotates models across requests to spread load": "Round Robin — luân phiên model qua các request để phân tải",
+  "Fusion — queries all models in parallel, then a judge synthesizes one answer. Best quality, but costs the most: every request bills all panel models + the judge (N+1 calls)": "Fusion — truy vấn tất cả model song song, sau đó một judge tổng hợp thành một câu trả lời. Chất lượng cao nhất nhưng tốn kém nhất: mỗi request tính phí tất cả panel models + judge (N+1 calls)",
+  "Capacity auto-switch — sends image/PDF/audio requests to a model that supports them first": "Capacity auto-switch — gửi request hình ảnh/PDF/audio đến model hỗ trợ trước"
 }
