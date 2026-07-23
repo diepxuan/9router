@@ -522,7 +522,7 @@ Toàn bộ hook DiepXuan (combo fail tracker, web fallback, executor NVIDIA stri
 | `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx` | **không wrap** (always-on: thay thế hoàn toàn base component, wrap = mất feature) |
 | `src/app/api/v1/models/route.js` (NVIDIA resolver + context_length) | có (qua wrapper trong `open-sse/diepxuan/contextLength/*`) |
 | `open-sse/diepxuan/contextLength/index.js` | có (2026-07-22) |
-| `open-sse/diepxuan/contextLength/cache.js` | có (2026-07-22) |
+| `open-sse/diepxuan/contextLength/cache.js` | có (2026-07-22; fix import 2026-07-23 — xem mục 13) |
 | `open-sse/diepxuan/contextLength/modelsApi.js` | có (2026-07-22) |
 | `open-sse/diepxuan/contextLength/errorParser.js` | có (2026-07-22) |
 
@@ -623,6 +623,14 @@ Tự động thu thập và cập nhật `context_length` (max tokens) cho mọi
 1. **Provider `/v1/models` API** — 1 call / 24h, cache vào SQLite
 2. **Parse 400 error** — Học từ lỗi `maximum context length is X tokens`
 3. **MODEL_INFO static** — Fallback cuối cùng
+
+### Bug fix 2026-07-23: thiếu import `isDiepXuanEnabled` trong `cache.js`
+
+- **Triệu chứng:** log dev bắn liên tục (mỗi ~1s) `Error fetching models: ReferenceError: isDiepXuanEnabled is not defined` mỗi khi provider fetch model (đi qua `resolveProviderModelsWithContext` → `upsertContextLength`).
+- **Nguyên nhân:** `open-sse/diepxuan/contextLength/cache.js` gọi `isDiepXuanEnabled()` trong `upsertContextLength()` nhưng **quên import**. Bảng ở mục 11 ghi file này "có guard" từ 2026-07-22, nhưng guard ném ReferenceError vì thiếu import (guard chỉ thật sự hoạt động sau fix này).
+- **Fix:** thêm `import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";` — cùng đường dẫn với các module anh em (`modelsApi.js`, `errorParser.js`, `index.js`).
+- **Bài học (tránh lặp lại):** khi thêm guard `isDiepXuanEnabled()` vào file fork layer mới, luôn kiểm tra dòng import đi kèm; `node --check` không bắt được lỗi này (biến undefined chỉ ném lúc runtime).
+- **Verify:** `node --check` PASS; gọi `/api/models` + `/api/v1/models` → 200; log 0 lỗi `isDiepXuanEnabled` (trước đó bắn mỗi giây).
 
 ### Files cần giữ (fork layer)
 
