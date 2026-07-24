@@ -37,6 +37,7 @@ const NAMELESS_BUILTIN_TYPES = new Set(["tool_search", "web_search", "image_gene
 // reproducing the same upstream error.
 const TARGETS = {
   "minimax-cn": new Set(["MiniMax-M3"]),
+  "minimax": new Set(["MiniMax-M3", "MiniMax-M2.7"]),
 };
 
 /**
