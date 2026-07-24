@@ -7,7 +7,7 @@
     "forkBranch": "main",
     "upstreamBranch": "master",
     "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
-    "note": "Schema 1. As of 2026-07-22, 14 features (was 13: added auto-context-length; removed nvidia-executor-strip because open-sse/diepxuan/executorHooks.js was deleted as confirmed dead code on 2026-07-22). fork-branding-header: removed forbiddenFiles rule because upstream added DonateModal.js back in v0.5.40 (commit ccb0842d). Fork keeps file but strips import in Header.js."
+    "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 (minimax-m3-strip-builtin-tools, mimo-free-parse-error-cooldown, error-observability-body-and-messagecount) -> 17 features."
   },
   "features": [
     {
@@ -673,6 +673,94 @@
         "open-sse/diepxuan/contextLength/modelsApi.js",
         "open-sse/diepxuan/contextLength/errorParser.js",
         "src/app/api/v1/models/route.js"
+      ]
+    },
+    {
+      "id": "minimax-m3-strip-builtin-tools",
+      "description": "For combo minimax-cn + MiniMax-M3 only, drop 3 Codex built-in tools (tool_search, web_search, image_generation) that lack a function name and cause upstream 400 'function name is empty (2013)'.",
+      "requiredFiles": [
+        "open-sse/diepxuan/transformers/stripBuiltinTools.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+          "pattern": "NAMELESS_BUILTIN_TYPES"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+          "pattern": "\"minimax-cn\": new Set\\(\\[\"MiniMax-M3\"\\]\\)"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+          "pattern": "stripBuiltinTools"
+        },
+        {
+          "file": "open-sse/translator/index.js",
+          "pattern": "stripBuiltinTools"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+        "open-sse/translator/index.js"
+      ]
+    },
+    {
+      "id": "mimo-free-parse-error-cooldown",
+      "description": "Fork-layer wrapper around MimoFreeExecutor that returns a 1-hour cooldown (status 429, resetsAtMs) when upstream replies with error.code '441' high-frequency rate-limit. Combo fallback and connection cooldown skip the provider until the timer elapses.",
+      "requiredFiles": [
+        "open-sse/diepxuan/executors/mimo-free.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "DiepxuanMimoFreeExecutor"
+        },
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "parseMimoFreeError"
+        },
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "MIMO_RATE_LIMIT_CODES"
+        },
+        {
+          "file": "open-sse/executors/index.js",
+          "pattern": "DiepxuanMimoFreeExecutor"
+        },
+        {
+          "file": "open-sse/executors/index.js",
+          "pattern": "isDiepXuanEnabled\\(\\) \\? DiepxuanMimoFreeExecutor : MimoFreeExecutor"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/executors/mimo-free.js",
+        "open-sse/executors/index.js"
+      ]
+    },
+    {
+      "id": "error-observability-body-and-messagecount",
+      "description": "Capture raw upstream body and parsed JSON error plus per-record messageCount in requestDetails so root-cause analysis does not lose upstream type/code fields. Backward-compatible: parseUpstreamError adds optional `body`/`errorBody` returns; chatCore error path persists them.",
+      "requiredPatterns": [
+        {
+          "file": "open-sse/utils/error.js",
+          "pattern": "errorBody:"
+        },
+        {
+          "file": "open-sse/utils/error.js",
+          "pattern": "body: bodyText \\|\\| undefined"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "upstreamErrorBody"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "messageCount"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/utils/error.js",
+        "open-sse/handlers/chatCore.js"
       ]
     }
   ]
