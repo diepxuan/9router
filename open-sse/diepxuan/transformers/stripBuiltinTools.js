@@ -22,7 +22,10 @@
 //   Other providers/models pass through untouched — preserves backward
 //   compatibility for upstream behavior we are not yet sure about.
 //
-// Wired from `translator/index.js` after `wrapToolsForMinimax`.
+// Wired from `translator/index.js` BEFORE `wrapToolsForMinimax`.
+// CRITICAL: must run before wrapToolsForMinimax because wrap converts the
+// `type` field (e.g. "tool_search" → "function"), destroying the identifier
+// that this module relies on.
 
 import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 

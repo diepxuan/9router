@@ -1388,15 +1388,17 @@ Các provider/model khác (kể cả `minimax` non-cn) pass-through nguyên vẹ
 
 | File | Thay đổi |
 |------|----------|
-| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` ngay sau `wrapToolsForMinimax(result, provider)` |
+| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` **trước** `wrapToolsForMinimax(result, provider)` |
 
 ### Vị trí hook trong pipeline
 
 ```
-translateRequest() → ... → wrapToolsForMinimax() [fork: opens]  → stripBuiltinTools() [fork: prunes 3 nameless]
+translateRequest() → ... → stripBuiltinTools() [fork: prunes 3 nameless]  → wrapToolsForMinimax() [fork: opens]
 ```
 
-Strip phải chạy SAU wrap (vì wrap đã có shape ổn định), nhưng thực tế strip không phụ thuộc wrap — chỉ cần trước khi dispatch.
+> **CRITICAL:** Strip phải chạy **TRƯỚC** wrap. `wrapToolsForMinimax` chuyển đổi `type` field của tool (vd `"tool_search"` → `"function"`),
+> phá hủy identifier mà `stripBuiltinTools` cần để nhận diện. Bug này đã được phát hiện và sửa trong PR review.
+> Xem [review PR #54](https://github.com/diepxuan/9router/pull/54#discussion) để biết thêm chi tiết.
 
 ### Provider filter (giữ nguyên sau PR #52)
 

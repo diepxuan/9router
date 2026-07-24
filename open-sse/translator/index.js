@@ -135,16 +135,20 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
     result = prepareClaudeRequest(result, provider, apiKey, connectionId, credentials?.rawHeaders, clientSessionId);
   }
 
+  // diepxuan: Codex CLI emits 3 built-in tools (`tool_search`, `web_search`,
+  // `image_generation`) without a function name. For specific provider+model
+  // combinations listed in TARGETS, strip them before wrapping so the
+  // gateway does not reject with 400 "function name is empty (2013)".
+  //
+  // CRITICAL: strip must run BEFORE wrapToolsForMinimax because wrap
+  // converts the `type` field (e.g. "tool_search" → "function"), which
+  // destroys the identifier that strip relies on.
+  stripBuiltinTools(result, provider, model);
+
   // diepxuan: minimax-cn gateway expects OpenAI-shape tools {type:"function", function:{...}}
   // even on the Claude-compatible endpoint. Anthropic-shape tools trigger
   // "function is empty (2013)". Re-wrap just before dispatch.
   wrapToolsForMinimax(result, provider);
-
-  // diepxuan: Codex CLI emits 3 built-in tools (`tool_search`, `web_search`,
-  // `image_generation`) without a function name. For specific provider+model
-  // combinations listed in TARGETS, strip them BEFORE wrapping so the gateway
-  // does not reject with 400 "function name is empty (2013)".
-  stripBuiltinTools(result, provider, model);
 
   // Claude cloaking: rename client tools with _cc suffix (anti-ban)
   // quirk: only providers flagged cloakToolsOnOAuth, and only with an OAuth token
