@@ -1,5 +1,7 @@
 import { FORMATS } from "./formats.js";
 import { ensureToolCallIds, fixMissingToolResponses } from "./concerns/toolCall.js";
+import { sanitizeToolCallIdsForNvidia } from "../diepxuan/nvidia/cleanToolIds.js";
+import { wrapToolsForMinimax } from "../diepxuan/transformers/wrapToolsForMinimax.js";
 import { prepareClaudeRequest } from "./formats/claude.js";
 import { cloakClaudeTools } from "../utils/claudeCloaking.js";
 import { filterToOpenAIFormat } from "./formats/openai.js";
@@ -61,9 +63,13 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
 
   // Always ensure tool_calls have id (some providers require it)
   ensureToolCallIds(result);
-  
+
   // Fix missing tool responses (insert empty tool_result if needed)
   fixMissingToolResponses(result);
+
+  // diepxuan: NVIDIA NIM requires [a-zA-Z0-9]{9} tool_call ids (stricter than
+  // Anthropic pattern). Rewrite ids for NVIDIA target after base sanitizer.
+  sanitizeToolCallIdsForNvidia(result, provider);
 
   // Capture thinking intent from the original (pre-translation) body, before any
   // format conversion strips/renames the fields. Applied after translation.
@@ -127,6 +133,11 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
     const apiKey = credentials?.accessToken || credentials?.apiKey || null;
     result = prepareClaudeRequest(result, provider, apiKey, connectionId, credentials?.rawHeaders, clientSessionId);
   }
+
+  // diepxuan: minimax-cn gateway expects OpenAI-shape tools {type:"function", function:{...}}
+  // even on the Claude-compatible endpoint. Anthropic-shape tools trigger
+  // "function is empty (2013)". Re-wrap just before dispatch.
+  wrapToolsForMinimax(result, provider);
 
   // Claude cloaking: rename client tools with _cc suffix (anti-ban)
   // quirk: only providers flagged cloakToolsOnOAuth, and only with an OAuth token
