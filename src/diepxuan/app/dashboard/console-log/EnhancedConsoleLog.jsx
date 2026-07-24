@@ -78,36 +78,41 @@ function RequestTimeline({ request }) {
   if (!request) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
-        Select a request to view details
+        <div className="text-center">
+          <svg className="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-sm">Select a request to view details</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pr-1">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-700 pb-2">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">
+      <div className="flex items-center justify-between border-b border-gray-700 pb-2 flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <h2 className="text-lg font-semibold flex-shrink-0">
             Request {request.id}
           </h2>
-          <span className={`px-2 py-0.5 rounded text-sm ${
+          <span className={`px-2 py-0.5 rounded text-sm flex-shrink-0 ${
             request.type === 'combo' ? 'bg-orange-900/50 text-orange-300' : 'bg-blue-900/50 text-blue-300'
           }`}>
             {request.type === 'combo' ? `COMBO: ${request.comboName}` : 'SINGLE'}
           </span>
           {request.status === 'success' && (
-            <span className="text-green-400">✓ SUCCESS</span>
+            <span className="text-green-400 flex-shrink-0">✓ SUCCESS</span>
           )}
         </div>
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-gray-400 flex-shrink-0">
           {request.startTimestamp} - {request.endTime || '...'}
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Model Timeline */}
       {request.type === 'combo' && request.models.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4">
+        <div className="bg-gray-900 rounded-lg p-4 flex-shrink-0">
           <h3 className="text-sm text-gray-400 mb-3">MODEL TIMELINE</h3>
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {request.models.map((model, i) => (
@@ -140,7 +145,7 @@ function RequestTimeline({ request }) {
       )}
 
       {/* Log lines */}
-      <div className="bg-black rounded-lg p-4 text-xs font-mono flex-1 min-h-0 overflow-auto">
+      <div className="bg-black rounded-lg p-4 text-xs font-mono">
         <div className="space-y-0.5">
           {request.lines.map((line, i) => {
             const level = getLevelFromLine(line);
@@ -411,22 +416,26 @@ export default function EnhancedConsoleLog() {
       </div>
 
       {/* Right Panel - Timeline Detail */}
-      <div className="flex-1 bg-gray-900 rounded-lg p-4 overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex-1 bg-gray-900 rounded-lg p-4 flex flex-col overflow-hidden min-w-0">
+        {/* Fixed header: connection status + clear button */}
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-sm text-gray-400">
               {connected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-shrink-0">
             <Button size="sm" variant="outline" icon="delete" onClick={handleClear}>
               Clear
             </Button>
           </div>
         </div>
 
-        <RequestTimeline request={selectedRequest} />
+        {/* Scrollable timeline area */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <RequestTimeline request={selectedRequest} />
+        </div>
       </div>
     </div>
   );
