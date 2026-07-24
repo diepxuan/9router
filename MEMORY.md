@@ -74,6 +74,7 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 
 | Ngày | Sự kiện |
 |------|---------|
+| 2026-07-24 | PR #52: NVIDIA tool_call_id sanitizer + MiniMax tool wrapper (fix 92% + 74% error rate) |
 | 2026-07-23 | PR #46 (fork DiepXuan → main), PR #51 (i18n vi combos + RR label) merged |
 | 2026-07-23 | Round Robin: key "Vòng tròn" → "Luân phiên" (chuẩn kỹ thuật) theo yêu cầu Sếp |
 | 2026-07-23 | vi.json: 196 → 201 keys, không sửa base file (runtime i18n) |
@@ -81,5 +82,5 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 | 2026-07-21 | Tách SOUL/IDENTITY/USER/TOOLS single source of truth (PR #44) |
 
 ### Phiên bản sau merge
-- main: v0.5.40 + fork layer (commit 1464cd94)
-- diepxuan: v0.5.40 + 12 fork commits
+- main: v0.5.40 + fork layer (commit d93e7a87, PR #52)
+- DiepXuan custom features: 21 features (thêm NVIDIA sanitizer + MiniMax wrapper)

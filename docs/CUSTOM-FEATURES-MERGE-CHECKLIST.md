@@ -1336,3 +1336,273 @@ node --check open-sse/translator/concerns/paramSupport.js
      -d '{"model":"nvidia/minimaxai/minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":16}'
    ```
    Kỳ vọng: 200 như cũ
+
+## 23. Codex built-in tool pruner — minimax-cn/MiniMax-M3 — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 còn lại sau PR #52 (MiniMax tool wrapper) trên **combo cụ thể** `minimax-cn` + model `MiniMax-M3`:
+
+```
+400 "invalid params, function name is empty (2013)"
+```
+
+### DB snapshot (2026-07-24, sau PR #52)
+
+| Provider | Error | Success | Tỷ lệ lỗi |
+|---|---|---|---|
+| `minimax-cn` | 188 | 41 | **82%** |
+| `minimax` | 23 | 132 | 15% |
+
+Trong 188 lỗi của `minimax-cn`:
+- 147 × `function name is empty (2013)` (3 Codex built-in tools không có `name`)
+- 25 × `invalid tool type` (`type=custom`, `type=namespace`)
+- 12 × `function is empty` (object shape không khớp wrapper)
+- 4 lỗi account/key/quota (không liên quan)
+
+3 tool Codex-built-in thiếu `name`:
+
+```jsonc
+{ type: "tool_search" }
+{ type: "web_search" }
+{ type: "image_generation" }
+```
+
+`prepareClaudeRequest` filter (`claude.js` ~line 331) chỉ loại tools có `type !== "function"`. Khi wrapper ép về OpenAI-shape, không tìm được `name` nên gateway reject.
+
+### Cách fix
+
+Chỉ áp dụng cho **combo provider+model cụ thể**:
+- `provider === "minimax-cn"`
+- `model === "MiniMax-M3"`
+
+Các provider/model khác (kể cả `minimax` non-cn) pass-through nguyên vẹn — bảo toàn backward compatibility.
+
+### Files fork layer
+
+| File | Vai trò |
+|------|---------|
+| `open-sse/diepxuan/transformers/stripBuiltinTools.js` | Hook mới. Nhận `body` + `provider` + `model`, filter `tool_search`/`web_search`/`image_generation` khỏi `body.tools`. Khi rỗng → `delete body.tools`. |
+
+### Base files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` **trước** `wrapToolsForMinimax(result, provider)` |
+
+### Vị trí hook trong pipeline
+
+```
+translateRequest() → ... → stripBuiltinTools() [fork: prunes 3 nameless]  → wrapToolsForMinimax() [fork: opens]
+```
+
+> **CRITICAL:** Strip phải chạy **TRƯỚC** wrap. `wrapToolsForMinimax` chuyển đổi `type` field của tool (vd `"tool_search"` → `"function"`),
+> phá hủy identifier mà `stripBuiltinTools` cần để nhận diện. Bug này đã được phát hiện và sửa trong PR review.
+> Xem [review PR #54](https://github.com/diepxuan/9router/pull/54#discussion) để biết thêm chi tiết.
+
+### Provider filter (giữ nguyên sau PR #52)
+
+| Provider | Model | Filter nameless builtins? |
+|----------|-------|---------------------------|
+| `minimax-cn` | `MiniMax-M3` | YES (mục tiêu chính) |
+| `minimax-cn` | `MiniMax-M2.7` | no (còn ít lỗi, chưa đủ dữ liệu) |
+| `minimax` | bất kỳ | no (provider không trong TARGETS) |
+| các provider khác | bất kỳ | no |
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/transformers/stripBuiltinTools.js
+
+# Import + call còn nguyên trong base
+grep -q 'stripBuiltinTools' open-sse/translator/index.js
+
+# Targets chỉ liệt kê MiniMax-M3 combo
+grep -q '"minimax-cn": new Set(\["MiniMax-M3"\])' open-sse/diepxuan/transformers/stripBuiltinTools.js
+
+# Syntax
+node --check open-sse/diepxuan/transformers/stripBuiltinTools.js
+node --check open-sse/translator/index.js
+```
+
+### Unit test
+
+```bash
+# 12 PASS / 0 FAIL — see /tmp/test_stripBuiltinTools.mjs
+```
+
+Bao gồm 9/12 case (mix với Codex real payload 20 tool → 17 kept) + 3 edge case (`tools.length=0`, không có key, body all-nameless).
+
+### Smoke test khuyến nghị
+
+1. **Codex CLI với minimax-cn/MiniMax-M3**: request bình thường → kỳ vọng giảm lỗi 400 xuống dưới 10%.
+
+2. **Codex CLI với minimax-cn/MiniMax-M2.7**: behavior không đổi (chưa active).
+
+3. **non-Codex client với minimax-cn/MiniMax-M3**: behavior không đổi (không có 3 nameless tools để strip).
+
+### Tác động kỳ vọng
+
+| Provider | Trước | Sau (kỳ vọng) |
+|----------|-------|---------------|
+| `minimax-cn` MiniMax-M3 | 82% error | < 10% error |
+
+Phần lỗi còn lại là rate-limit / quota / thỉnh thoảng upstream validation — sẽ phân tích tiếp nếu Sếp yêu cầu.
+
+---
+
+## 24. MiMo Code Free (`mimo-free` / alias `mmf`) — parseError cooldown cho error 441 — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 từ MiMo Code Free:
+
+```json
+{ "error": { "code": "441",
+             "message": "Detected high-frequency non-compliant requests from you. Please consciously comply with the platform usage agreement. If you need to appeal, contact us through the official website channels." } }
+```
+
+DB snapshot (2026-07-24, 5 giờ gần nhất):
+- 6 lỗi trong 1 giờ, 100% đều code 441, model `mimo-auto`, provider `mimo-free`.
+
+### Nguyên nhân
+
+`MimoFreeExecutor` base (`open-sse/executors/mimo-free.js`) đã handle `401`/`403` với retry-once-after-bootstrap, nhưng **không** handle code 441:
+- Status HTTP vẫn là 400 (không phải 429).
+- `parseError` chưa được định nghĩa ở base → `parseUpstreamError` trong `utils/error.js` rơi về JSON message extraction, **không** set `resetsAtMs`.
+- Combo fallback không skip → request lặp lại trong vài phút → ban tiếp.
+
+### Cách fix
+
+Fork-layer subclass `MimoFreeExecutor` và override `parseError(response, bodyText)`:
+- Nhận diện response 400 với `error.code === "441"`.
+- Trả `{ status: 429, message, resetsAtMs: Date.now() + 60*60*1000 }`.
+- Status 429 để combo fallback / connection cooldown skip.
+
+### Files fork layer
+
+| File | Vai trò |
+|------|---------|
+| `open-sse/diepxuan/executors/mimo-free.js` | Wrapper class `DiepxuanMimoFreeExecutor extends MimoFreeExecutor` + pure function `parseMimoFreeError(response, bodyText)` xuất để test/doc. |
+
+### Base files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/executors/index.js` | Import `DiepxuanMimoFreeExecutor` + chọn class theo `isDiepXuanEnabled()` cho 2 key `"mimo-free"` và `"mmf"`. Khi flag off → dùng base executor cũ byte-for-byte. |
+
+### Provider filter
+
+| Provider | Model | Active parseError? |
+|----------|-------|-------------------|
+| `mimo-free` | bất kỳ | YES (combo wrapper) |
+| `mmf` | bất kỳ | YES (alias → cùng class) |
+| các provider khác | bất kỳ | no |
+
+### Hardening
+
+- `MIMO_RATE_LIMIT_CODES = new Set(["441"])` — set lookup, dễ mở rộng sau (vd "442", "443" nếu upstream phát sinh).
+- `MIMO_COOLDOWN_MS = 60 * 60 * 1000` (1 giờ) — em đặt 1h vì upstream text nói "appeal through official website", retry trong 1h gần như chắc chắn fail.
+- Không throw exception trong `parseError` — luôn return `null` cho non-match cases → falls back to default message extraction → không phá vỡ upstream behavior.
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/executors/mimo-free.js
+
+# Import + registry switch còn nguyên trong base
+grep -q 'DiepxuanMimoFreeExecutor' open-sse/executors/index.js
+grep -q 'isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor' open-sse/executors/index.js
+
+# Syntax
+node --check open-sse/diepxuan/executors/mimo-free.js
+node --check open-sse/executors/index.js
+```
+
+### Unit test
+
+```bash
+# 11 PASS / 0 FAIL — see /tmp/test_mimo_parser.mjs
+```
+
+Bao gồm: real upstream body, status 401, missing code, khác code, non-JSON, no `.error` key, null response, numeric `441`, empty `message`.
+
+### Smoke test khuyến nghị
+
+1. **Repeat request MiMo** trong cùng giờ — kỳ vọng request thứ 2 nhận `resetsAtMs` > hiện tại + 30 phút.
+2. **Request sau 1 giờ** — kỳ vọng trở lại behavior bình thường (re-bootstrap).
+3. **non-MiMo provider** không ảnh hưởng.
+
+### Lưu ý
+
+Đây là fix **client-side** về phía observability + cooldown. Nguyên nhân gốc (server ban vì high-frequency rate) nằm ở MiMo — không có fix code hoàn toàn từ phía 9Router. Nếu muốn giảm triệt để, cần throttle phía client (Codex CLI / dashboard).
+
+---
+
+## 25. Error observability — raw upstream body + structured error + messageCount — 2026-07-24
+
+### Mục đích
+
+Observability của error path trước PR này chỉ lưu `response.error = JSON-stringified message`. Khi Sếp phải debug lỗi MiniMax M3 400, root-cause analysis thiếu:
+- Raw upstream body (để so sánh nhiều error khác nhau).
+- Structured fields `error.type`, `error.code` (vd `invalid_request_error`, code `2013`) — bị strip khi extract `message`.
+- Conversation length — để group "short-thread failures" vs "long-thread failures".
+
+### Cách fix
+
+Bổ sung 3 thứ vào error path (không phá backward compat):
+
+1. `parseUpstreamError()` thêm 2 field return: `body` (string), `errorBody` (parsed JSON nếu là JSON, undefined nếu không).
+2. `chatCore.js` error path propagate 3 field mới vào `response` block:
+   - `response.body`: raw upstream body
+   - `response.errorBody`: parsed JSON
+   - `response.errorType`: `errorBody.error?.type || errorBody.type`
+   - `response.errorCode`: `errorBody.error?.code ?? errorBody.code`
+3. Top-level `messageCount` trong record `requestDetails` để query SQL dễ:
+   ```sql
+   SELECT COUNT(*) FROM requestDetails
+   WHERE json_extract(data, '$.messageCount') > 50
+         AND status='error' AND provider='minimax-cn';
+   ```
+
+### Files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/utils/error.js` | `parseUpstreamError` thêm return fields `body`, `errorBody` (extra, ignored by callers cũ) |
+| `open-sse/handlers/chatCore.js` | Error path propagate `body`, `errorBody`, `errorType`, `errorCode` + top-level `messageCount` |
+
+### Backward compatibility
+
+- `parseUpstreamError` signature không đổi — chỉ thêm field `body`/`errorBody`. Caller nào destructure `{statusCode, message}` thì vẫn nhận đúng giá trị cũ.
+- `chatCore.js` error path chỉ đổi nội bộ save `requestDetails` — không ảnh hưởng `createErrorResult` trả về client.
+- `truncateField` ở `requestDetailsRepo.js` đã có sẵn tự động truncate field > `observabilityMaxJsonSize` (default 5KB), nên `body` lớn không phình DB.
+
+### Không thêm test file
+
+Vì là observability enhancement, không có unit test deterministic. Verify bằng cách:
+1. Trigger 1 lỗi MiniMax M3 bất kỳ (qua Codex CLI).
+2. SQL query `requestDetails` tìm row mới nhất → kiểm tra `response.body`, `response.errorBody`, `messageCount` không null.
+
+### Smoke test khuyến nghị
+
+```bash
+# 1. Trigger lỗi (vd gửi MiniMax M3 + tools có tool_search)
+# 2. Query DB
+sqlite3 ~/.9router/db/data.sqlite "
+SELECT json_extract(data, '\$.response.errorCode') AS errCode,
+       json_extract(data, '\$.response.errorType') AS errType,
+       json_extract(data, '\$.messageCount') AS msgN
+FROM requestDetails
+WHERE provider='minimax-cn' AND model='MiniMax-M3' AND status='error'
+ORDER BY timestamp DESC LIMIT 3;
+"
+# Mong đợi: errCode='2013', errType='invalid_request_error', msgN=number
+```
+
+### Tác động
+
+- DB row size tăng ~1-2KB / row error (body). Tự truncate bởi repo. maxRecords mặc định 200 → không ảnh hưởng disk đáng kể.
+- Phase đầu fix observability — phase sau có thể thêm dashboard filter / alert theo `errorCode`.

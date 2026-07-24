@@ -53,7 +53,14 @@ export async function writeStreamError(writer, statusCode, message) {
  * Parse upstream provider error response
  * @param {Response} response - Fetch response from provider
  * @param {object} [executor] - Optional executor with parseError() override for provider-specific parsing
- * @returns {Promise<{statusCode: number, message: string, resetsAtMs?: number}>}
+ * @returns {Promise<{statusCode: number, message: string, resetsAtMs?: number, body?: string, errorBody?: object|string}>}
+ *
+ * DiepXuan fork-layer extension (2026-07-24):
+ *   Returns `body` (raw upstream body string) and `errorBody` (parsed JSON
+ *   of `body` if applicable, else `undefined`). Callers may persist these
+ *   in observability records so root-cause analysis does not lose upstream
+ *   type / code fields that `message` extraction drops. `message` stays
+ *   unchanged so all existing callers behave identically.
  */
 export async function parseUpstreamError(response, executor = null) {
   let bodyText = "";
@@ -69,15 +76,22 @@ export async function parseUpstreamError(response, executor = null) {
       const parsed = executor.parseError(response, bodyText);
       if (parsed && typeof parsed === "object") {
         const msg = parsed.message || DEFAULT_ERROR_MESSAGES[response.status] || `Upstream error: ${response.status}`;
-        return { statusCode: parsed.status || response.status, message: msg, resetsAtMs: parsed.resetsAtMs };
+        return {
+          statusCode: parsed.status || response.status,
+          message: msg,
+          resetsAtMs: parsed.resetsAtMs,
+          body: bodyText || undefined,
+          errorBody: undefined
+        };
       }
     } catch { /* fall through to default parsing */ }
   }
 
   let message = "";
+  let parsedJson = null;
   try {
-    const json = JSON.parse(bodyText);
-    message = json.error?.message || json.message || json.error || bodyText;
+    parsedJson = JSON.parse(bodyText);
+    message = parsedJson.error?.message || parsedJson.message || parsedJson.error || bodyText;
   } catch {
     message = bodyText;
   }
@@ -85,7 +99,12 @@ export async function parseUpstreamError(response, executor = null) {
   const messageStr = typeof message === "string" ? message : JSON.stringify(message);
   const finalMessage = messageStr || DEFAULT_ERROR_MESSAGES[response.status] || `Upstream error: ${response.status}`;
 
-  return { statusCode: response.status, message: finalMessage };
+  return {
+    statusCode: response.status,
+    message: finalMessage,
+    body: bodyText || undefined,
+    errorBody: parsedJson || undefined
+  };
 }
 
 /**

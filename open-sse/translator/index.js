@@ -2,6 +2,7 @@ import { FORMATS } from "./formats.js";
 import { ensureToolCallIds, fixMissingToolResponses } from "./concerns/toolCall.js";
 import { sanitizeToolCallIdsForNvidia } from "../diepxuan/nvidia/cleanToolIds.js";
 import { wrapToolsForMinimax } from "../diepxuan/transformers/wrapToolsForMinimax.js";
+import { stripBuiltinTools } from "../diepxuan/transformers/stripBuiltinTools.js";
 import { prepareClaudeRequest } from "./formats/claude.js";
 import { cloakClaudeTools } from "../utils/claudeCloaking.js";
 import { filterToOpenAIFormat } from "./formats/openai.js";
@@ -133,6 +134,16 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
     const apiKey = credentials?.accessToken || credentials?.apiKey || null;
     result = prepareClaudeRequest(result, provider, apiKey, connectionId, credentials?.rawHeaders, clientSessionId);
   }
+
+  // diepxuan: Codex CLI emits 3 built-in tools (`tool_search`, `web_search`,
+  // `image_generation`) without a function name. For specific provider+model
+  // combinations listed in TARGETS, strip them before wrapping so the
+  // gateway does not reject with 400 "function name is empty (2013)".
+  //
+  // CRITICAL: strip must run BEFORE wrapToolsForMinimax because wrap
+  // converts the `type` field (e.g. "tool_search" → "function"), which
+  // destroys the identifier that strip relies on.
+  stripBuiltinTools(result, provider, model);
 
   // diepxuan: minimax-cn gateway expects OpenAI-shape tools {type:"function", function:{...}}
   // even on the Claude-compatible endpoint. Anthropic-shape tools trigger
