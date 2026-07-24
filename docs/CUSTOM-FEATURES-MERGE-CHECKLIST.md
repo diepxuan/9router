@@ -1110,3 +1110,134 @@ Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/
 
 - rev 1 (PR #50 commit `9aedad6c`): thêm 5 keys ban đầu, dùng "Round Robin" trong value.
 - rev 2 (sửa tiếp PR #50 hoặc PR mới): chuẩn hóa "Round Robin" key → "Luân phiên", thêm 3 keys cho STRATEGY_OPTIONS modal. Theo Sếp yêu cầu trực tiếp.
+
+---
+
+## 21. NVIDIA tool_call_id sanitizer + MiniMax tool wrapper — 2026-07-24
+
+### Mục đích
+
+Fix 2 lỗi 400 từ provider:
+1. **NVIDIA NIM** (92% failure rate, 399/432 requests) — tool_call_id không đúng pattern `[a-zA-Z0-9]{9}` (Anthropic cho phép underscore/hyphen, NVIDIA reject)
+2. **minimax-cn** (74% failure rate, 118/160 requests) — MiniMax M3 gateway reject Anthropic-shape tools, yêu cầu OpenAI-shape `{type:"function", function:{...}}`
+
+### Files fork layer
+
+```
+open-sse/diepxuan/nvidia/
+  cleanToolIds.js          -- Sanitize tool_call_ids → [a-zA-Z0-9]{9} cho NVIDIA
+                             + idMap để tool response dùng chung id với assistant tool_call
+open-sse/diepxuan/transformers/
+  wrapToolsForMinimax.js   -- anthropicToolsToOpenAI(): wrap Anthropic-shape tools về OpenAI-shape
+                             cho minimax-cn/minimax gateway
+```
+
+### Base files bị sửa
+
+| Base file | Thay đổi |
+|-----------|----------|
+| `open-sse/translator/index.js` | Import + gọi `sanitizeToolCallIdsForNvidia()` sau `ensureToolCallIds()`,
+                                import + gọi `wrapToolsForMinimax()` sau `prepareClaudeRequest()` |
+| `open-sse/translator/request/openai-to-claude.js` | Xoá dòng `type: "function"` (redundant — `wrapToolsForMinimax` handle) |
+
+### Vị trí hook trong pipeline
+
+**NVIDIA:**
+1. `ensureToolCallIds()` — base: đảm bảo mọi tool_call đều có id (Anthropic pattern `[a-zA-Z0-9_-]+`)
+2. `sanitizeToolCallIdsForNvidia()` — fork: rewrite id chưa đạt chuẩn NVIDIA về `[a-zA-Z0-9]{9}`
+3. Các bước format conversion tiếp theo
+
+**MiniMax:**
+1. Format conversion (vd openai→claude): tools chuyển từ OpenAI-shape sang Anthropic-shape
+2. `prepareClaudeRequest()`: chuẩn bị request cho Claude endpoint
+3. `wrapToolsForMinimax()` — fork: wrap tools về OpenAI-shape `{type:"function", function:{...}}`
+4. Dispatch đến gateway
+
+### idMap bug fix (2026-07-24)
+
+- **Triệu chứng:** tool response (`role: "tool"`) dùng id được sinh từ position khác với assistant tool_call → id lệch nhau → provider reject
+- **Nguyên nhân:** `sanitizeToolCallIdsForNvidia()` rewrite assistant tool_call_ids (dùng `msgIndex:tcIndex:toolName`) và tool response tool_call_ids (dùng `msgIndex:0:null`) độc lập → 2 id khác nhau
+- **Fix:** thêm `Map<oldId, newId>` trong cùng 1 pass, tool response lookup id từ map trước, fallback sang positional hash nếu không có mapping
+- **Verify:** unit test Test 4 (tool response) PASS — tool_call_id được rewrite với mapping
+
+### Guard flag
+
+Cả 2 hook đều wrap với `isDiepXuanEnabled()`:
+- `DIEPXUAN_ENABLED=false` → no-op (giữ nguyên hành vi upstream)
+- Không dùng `DIEPXUAN_SAFE_MODE` (chưa cần)
+
+### Provider filter
+
+- `sanitizeToolCallIdsForNvidia()`: chỉ chạy khi `provider === "nvidia"` (Set `NVIDIA_PROVIDER_IDS`)
+- `wrapToolsForMinimax()`: chỉ chạy khi `provider === "minimax-cn" || provider === "minimax"` (Set `TARGETS`)
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/nvidia/cleanToolIds.js
+test -f open-sse/diepxuan/transformers/wrapToolsForMinimax.js
+
+# Import còn nguyên trong base
+grep -q 'sanitizeToolCallIdsForNvidia' open-sse/translator/index.js
+grep -q 'wrapToolsForMinimax' open-sse/translator/index.js
+
+# Tool shape không còn type:function trong openai-to-claude
+grep -v 'type: "function"' open-sse/translator/request/openai-to-claude.js | grep -q 'name: toolName'
+
+# Syntax
+node --check open-sse/diepxuan/nvidia/cleanToolIds.js
+node --check open-sse/diepxuan/transformers/wrapToolsForMinimax.js
+node --check open-sse/translator/index.js
+```
+
+### Unit test
+
+```bash
+# NVIDIA sanitizer (13 tests)
+node --input-type=module </tmp/test_nvidia.js
+# Kỳ vọng: 13 PASS / 0 FAIL
+
+# MiniMax wrapper (20 tests)
+node --input-type=module </tmp/test_minimax.js
+# Kỳ vọng: 20 PASS / 0 FAIL
+
+# Translator integration (8 tests)
+node --input-type=module </tmp/test_translator_integration.js
+# Kỳ vọng: 8 PASS / 0 FAIL
+```
+
+### Smoke test khuyến nghị
+
+1. **NVIDIA** — Gọi proxy local với model NVIDIA + tool request:
+   ```bash
+   curl -s http://9router.diepxuan.corp:3000/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -d '{"model":"nvidia/llama-...","messages":[{"role":"user","content":"calc 2+2"},{"role":"assistant","content":"","tool_calls":[{"id":"test_123","type":"function","function":{"name":"calc","arguments":"{}"}}]}],"tools":[{"type":"function","function":{"name":"calc","parameters":{"type":"object"}}}]}'
+   ```
+   Kỳ vọng: 200 (không còn 400 vì tool_call_id có underscore)
+
+2. **minimax-cn** — Gọi proxy local với minimax-cn/MiniMax-M3 + tools:
+   ```bash
+   curl -s http://9router.diepxuan.corp:3000/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -d '{"model":"minimax-cn/MiniMax-M3","messages":[{"role":"user","content":"test"}],"tools":[{"type":"function","function":{"name":"test","parameters":{"type":"object","properties":{}}}}]}'
+   ```
+   Kỳ vọng: 200 (không còn 400 "function is empty (2013)")
+
+3. **non-MiniMax providers** — Gọi với minimax (không phải minimax-cn), agnes, openrouter → không ảnh hưởng
+
+### Verify đã chạy (2026-07-24)
+
+- `node --check`: 4 file PASS
+- `node scripts/diepxuan/check-custom-features.mjs`: 14 PASS / 0 WARN / 0 FAIL
+- Unit tests: 13/13 NVIDIA, 20/20 MiniMax, 8/8 translator integration — tổng 41/41 PASS
+- Code review: cleanToolIds.js + wrapToolsForMinimax.js — 2 review points fixed, reviewer confirm OK
+- DB snapshot trước merge: nvidia 92% fail, minimax-cn 74% fail
+
+### Tác động kỳ vọng
+
+Sau khi merge, tỷ lệ lỗi dự kiến:
+- NVIDIA: 92% → ~10-20% (chỉ còn rate limit / transient errors, không còn 400 tool_call_id)
+- minimax-cn: 74% → ~5-10% (chỉ còn rate limit / transient errors, không còn 400 "function is empty")
+- Các provider khác: không ảnh hưởng
