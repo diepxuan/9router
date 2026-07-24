@@ -21,6 +21,9 @@ const STRIP_RULES = [
   // "integer above maximum value, expected <= 32768". Pin an explicit endpoint cap;
   // min() with the model ceiling still applies if a variant's own limit is lower.
   { provider: "volcengine-ark", match: /kimi/i, maxOutputCap: 32768, clampToModelMaxOutput: true },
+  // NVIDIA NIM rejects unknown top-level params like `text: {"verbosity":"low"}`
+  // (sent by some AI coding tools). Strip before dispatch to avoid 400.
+  { provider: "nvidia", drop: ["text"] },
 ];
 
 // Test a rule's match (regex or predicate) against the model id.

@@ -1241,3 +1241,98 @@ Sau khi merge, tỷ lệ lỗi dự kiến:
 - NVIDIA: 92% → ~10-20% (chỉ còn rate limit / transient errors, không còn 400 tool_call_id)
 - minimax-cn: 74% → ~5-10% (chỉ còn rate limit / transient errors, không còn 400 "function is empty")
 - Các provider khác: không ảnh hưởng
+
+---
+
+## 22. NVIDIA NIM strip `text` param — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 từ NVIDIA NIM khi request chứa top-level parameter `text`:
+
+```
+❌ nvidia [400]: Validation: Unsupported parameter(s): `text`
+```
+
+### Nguyên nhân
+
+- Client (AI coding tool) gửi request kèm `text: {"verbosity":"low"}` — cấu hình verbosity, không phải input content.
+- NVIDIA NIM là OpenAI-compatible, chỉ chấp nhận params chuẩn (`model`, `messages`, `temperature`, `max_tokens`, `tools`...).
+- 9Router pass-through `text` nguyên vẹn → NVIDIA reject 400.
+
+### Nội dung `text` field (xác nhận qua DB query)
+
+| Item | Value |
+|------|-------|
+| `text` value | `{"verbosity":"low"}` |
+| Có phải input người dùng? | ❌ Không — input chat nằm trong `messages[]` |
+| Xoá có mất nội dung? | ❌ An toàn tuyệt đối |
+
+### Cách fix
+
+**Base file bị sửa:** `open-sse/translator/concerns/paramSupport.js`
+
+Thêm 1 rule vào `STRIP_RULES`:
+
+```js
+// NVIDIA NIM rejects unknown top-level params like `text: {"verbosity":"low"}`
+// (sent by some AI coding tools). Strip before dispatch to avoid 400.
+{ provider: "nvidia", drop: ["text"] },
+```
+
+### Cơ chế hoạt động
+
+1. `DefaultExecutor.transformRequest()` gọi `stripUnsupportedParams(provider, model, body)`.
+2. Rule match `provider === "nvidia"` (không filter model — áp dụng cho tất cả model NVIDIA).
+3. `delete body.text` nếu tồn tại.
+4. Request đến NVIDIA không còn `text` → pass validation.
+
+### Vị trí trong pipeline
+
+```
+translateRequest() → filterToOpenAIFormat() → stripUnsupportedParams() [fork: strip text] → injectReasoningContent() → executor.execute()
+```
+
+### So sánh với §17 (dead code)
+
+Section §17 mô tả `open-sse/diepxuan/executorHooks.js` (dead code — function `stripNvidiaUnsupportedParams` không ai gọi).
+Fix lần này khác:
+- **Không dùng fork layer** (`open-sse/diepxuan/**`).
+- **Dùng cơ chế có sẵn** `stripUnsupportedParams()` trong `paramSupport.js`, config-driven.
+- **Không cần guard flag** `isDiepXuanEnabled()` vì rule chỉ apply cho `provider === "nvidia"`, không ảnh hưởng upstream behavior.
+
+### File bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/translator/concerns/paramSupport.js` | Thêm 1 dòng rule `{ provider: "nvidia", drop: ["text"] }` vào `STRIP_RULES` |
+
+### Checklist sau merge upstream
+
+```bash
+# Rule còn nguyên trong paramSupport.js
+grep -q "provider: 'nvidia', drop: \\["text"\\]" open-sse/translator/concerns/paramSupport.js || grep -q 'provider: "nvidia", drop: \[\"text\"\]' open-sse/translator/concerns/paramSupport.js
+
+# Syntax check
+node --check open-sse/translator/concerns/paramSupport.js
+```
+
+### Smoke test khuyến nghị
+
+1. Gửi request đến NVIDIA có kèm `text` param:
+   ```bash
+   curl -s http://localhost:20128/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/minimaxai/minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":16,"text":{"verbosity":"low"}}'
+   ```
+   Kỳ vọng: 200 (không còn 400)
+
+2. Gửi request không có `text` — behavior không đổi:
+   ```bash
+   curl -s http://localhost:20128/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/minimaxai/minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":16}'
+   ```
+   Kỳ vọng: 200 như cũ
