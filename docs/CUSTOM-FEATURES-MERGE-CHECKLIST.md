@@ -1113,13 +1113,17 @@ Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/
 
 ---
 
-## 21. NVIDIA tool_call_id sanitizer — 2026-07-24 (MiniMax tool wrapper REMOVED 2026-07-25 — sai, convert sai tool format)
+## 21. NVIDIA tool_call_id sanitizer — 2026-07-24
+
+> **Cập nhật 2026-07-25:** Mục "MiniMax tool wrapper" trong section này đã bị REMOVED.
+> `wrapToolsForMinimax.js` là fix sai — convert Anthropic-shape tools sang OpenAI-shape, nhưng
+> MiniMax Claude endpoint yêu cầu Anthropic-shape `{name, description, input_schema}`.
+> Xem PR #58 để biết chi tiết.
 
 ### Mục đích
 
-Fix 2 lỗi 400 từ provider:
-1. **NVIDIA NIM** (92% failure rate, 399/432 requests) — tool_call_id không đúng pattern `[a-zA-Z0-9]{9}` (Anthropic cho phép underscore/hyphen, NVIDIA reject)
-2. **minimax-cn** (74% failure rate, 118/160 requests) — MiniMax M3 gateway reject Anthropic-shape tools, yêu cầu OpenAI-shape `{type:"function", function:{...}}`
+Fix lỗi 400 từ provider **NVIDIA NIM** — tool_call_id không đúng pattern `[a-zA-Z0-9]{9}`
+(Anthropic cho phép underscore/hyphen, NVIDIA reject).
 
 ### Files fork layer
 
@@ -1127,31 +1131,19 @@ Fix 2 lỗi 400 từ provider:
 open-sse/diepxuan/nvidia/
   cleanToolIds.js          -- Sanitize tool_call_ids → [a-zA-Z0-9]{9} cho NVIDIA
                              + idMap để tool response dùng chung id với assistant tool_call
-open-sse/diepxuan/transformers/
-  wrapToolsForMinimax.js   -- anthropicToolsToOpenAI(): wrap Anthropic-shape tools về OpenAI-shape
-                             cho minimax-cn/minimax gateway
 ```
 
 ### Base files bị sửa
 
 | Base file | Thay đổi |
 |-----------|----------|
-| `open-sse/translator/index.js` | Import + gọi `sanitizeToolCallIdsForNvidia()` sau `ensureToolCallIds()`,
-                                import + gọi `wrapToolsForMinimax()` sau `prepareClaudeRequest()` |
-| `open-sse/translator/request/openai-to-claude.js` | Xoá dòng `type: "function"` (redundant — `wrapToolsForMinimax` handle) |
+| `open-sse/translator/index.js` | Import + gọi `sanitizeToolCallIdsForNvidia()` sau `ensureToolCallIds()` |
 
 ### Vị trí hook trong pipeline
 
-**NVIDIA:**
 1. `ensureToolCallIds()` — base: đảm bảo mọi tool_call đều có id (Anthropic pattern `[a-zA-Z0-9_-]+`)
 2. `sanitizeToolCallIdsForNvidia()` — fork: rewrite id chưa đạt chuẩn NVIDIA về `[a-zA-Z0-9]{9}`
 3. Các bước format conversion tiếp theo
-
-**MiniMax:**
-1. Format conversion (vd openai→claude): tools chuyển từ OpenAI-shape sang Anthropic-shape
-2. `prepareClaudeRequest()`: chuẩn bị request cho Claude endpoint
-3. `wrapToolsForMinimax()` — fork: wrap tools về OpenAI-shape `{type:"function", function:{...}}`
-4. Dispatch đến gateway
 
 ### idMap bug fix (2026-07-24)
 
@@ -1162,32 +1154,24 @@ open-sse/diepxuan/transformers/
 
 ### Guard flag
 
-Cả 2 hook đều wrap với `isDiepXuanEnabled()`:
+Hook wrap với `isDiepXuanEnabled()`:
 - `DIEPXUAN_ENABLED=false` → no-op (giữ nguyên hành vi upstream)
-- Không dùng `DIEPXUAN_SAFE_MODE` (chưa cần)
 
 ### Provider filter
 
 - `sanitizeToolCallIdsForNvidia()`: chỉ chạy khi `provider === "nvidia"` (Set `NVIDIA_PROVIDER_IDS`)
-- `wrapToolsForMinimax()`: chỉ chạy khi `provider === "minimax-cn" || provider === "minimax"` (Set `TARGETS`)
 
 ### Checklist sau merge upstream
 
 ```bash
 # Files fork còn nguyên
 test -f open-sse/diepxuan/nvidia/cleanToolIds.js
-test -f open-sse/diepxuan/transformers/wrapToolsForMinimax.js
 
 # Import còn nguyên trong base
 grep -q 'sanitizeToolCallIdsForNvidia' open-sse/translator/index.js
-grep -q 'wrapToolsForMinimax' open-sse/translator/index.js
-
-# Tool shape không còn type:function trong openai-to-claude
-grep -v 'type: "function"' open-sse/translator/request/openai-to-claude.js | grep -q 'name: toolName'
 
 # Syntax
 node --check open-sse/diepxuan/nvidia/cleanToolIds.js
-node --check open-sse/diepxuan/transformers/wrapToolsForMinimax.js
 node --check open-sse/translator/index.js
 ```
 
@@ -1197,14 +1181,6 @@ node --check open-sse/translator/index.js
 # NVIDIA sanitizer (13 tests)
 node --input-type=module </tmp/test_nvidia.js
 # Kỳ vọng: 13 PASS / 0 FAIL
-
-# MiniMax wrapper (20 tests)
-node --input-type=module </tmp/test_minimax.js
-# Kỳ vọng: 20 PASS / 0 FAIL
-
-# Translator integration (8 tests)
-node --input-type=module </tmp/test_translator_integration.js
-# Kỳ vọng: 8 PASS / 0 FAIL
 ```
 
 ### Smoke test khuyến nghị
@@ -1217,30 +1193,16 @@ node --input-type=module </tmp/test_translator_integration.js
    ```
    Kỳ vọng: 200 (không còn 400 vì tool_call_id có underscore)
 
-2. **minimax-cn** — Gọi proxy local với minimax-cn/MiniMax-M3 + tools:
-   ```bash
-   curl -s http://9router.diepxuan.corp:3000/v1/chat/completions \
-     -H "Authorization: Bearer $KEY" \
-     -d '{"model":"minimax-cn/MiniMax-M3","messages":[{"role":"user","content":"test"}],"tools":[{"type":"function","function":{"name":"test","parameters":{"type":"object","properties":{}}}}]}'
-   ```
-   Kỳ vọng: 200 (không còn 400 "function is empty (2013)")
-
-3. **non-MiniMax providers** — Gọi với minimax (không phải minimax-cn), agnes, openrouter → không ảnh hưởng
-
 ### Verify đã chạy (2026-07-24)
 
-- `node --check`: 4 file PASS
-- `node scripts/diepxuan/check-custom-features.mjs`: 14 PASS / 0 WARN / 0 FAIL
-- Unit tests: 13/13 NVIDIA, 20/20 MiniMax, 8/8 translator integration — tổng 41/41 PASS
-- Code review: cleanToolIds.js + wrapToolsForMinimax.js — 2 review points fixed, reviewer confirm OK
-- DB snapshot trước merge: nvidia 92% fail, minimax-cn 74% fail
+- `node --check`: 2 file PASS
+- Unit tests: 13/13 NVIDIA PASS
+- Code review: cleanToolIds.js — reviewer confirm OK
+- DB snapshot trước merge: nvidia 92% fail
 
 ### Tác động kỳ vọng
 
-Sau khi merge, tỷ lệ lỗi dự kiến:
-- NVIDIA: 92% → ~10-20% (chỉ còn rate limit / transient errors, không còn 400 tool_call_id)
-- minimax-cn: 74% → ~5-10% (chỉ còn rate limit / transient errors, không còn 400 "function is empty")
-- Các provider khác: không ảnh hưởng
+NVIDIA: 92% → ~10-20% (chỉ còn rate limit / transient errors, không còn 400 tool_call_id)
 
 ---
 
@@ -1388,26 +1350,24 @@ Các provider/model khác (kể cả `minimax` non-cn) pass-through nguyên vẹ
 
 | File | Thay đổi |
 |------|----------|
-| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` **trước** `wrapToolsForMinimax(result, provider)` |
+| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` sau `prepareClaudeRequest()` |
 
 ### Vị trí hook trong pipeline
 
 ```
-translateRequest() → ... → stripBuiltinTools() [fork: prunes 3 nameless]  → wrapToolsForMinimax() [fork: opens]
+translateRequest() → ... → prepareClaudeRequest() [filter non-function types]  → stripBuiltinTools() [fork: prunes 3 nameless + unsupported types]
 ```
 
-> **CRITICAL:** Strip phải chạy **TRƯỚC** wrap. `wrapToolsForMinimax` chuyển đổi `type` field của tool (vd `"tool_search"` → `"function"`),
-> phá hủy identifier mà `stripBuiltinTools` cần để nhận diện. Bug này đã được phát hiện và sửa trong PR review.
-> Xem [review PR #54](https://github.com/diepxuan/9router/pull/54#discussion) để biết thêm chi tiết.
+> **Ghi chú 2026-07-25:** `wrapToolsForMinimax` đã bị xoá (PR #58) vì sai — convert tool shape không tương thích.
+> `prepareClaudeRequest` (claude.js) đã filter non-function types và convert tools sang Anthropic shape đúng format.
 
-### Provider filter (giữ nguyên sau PR #52)
+### Provider filter (cập nhật 2026-07-25)
 
-| Provider | Model | Filter nameless builtins? |
-|----------|-------|---------------------------|
-| `minimax-cn` | `MiniMax-M3` | YES (mục tiêu chính) |
-| `minimax-cn` | `MiniMax-M2.7` | no (còn ít lỗi, chưa đủ dữ liệu) |
-| `minimax` | bất kỳ | no (provider không trong TARGETS) |
-| các provider khác | bất kỳ | no |
+| Provider | Model | Strip nameless + unsupported types? |
+|----------|-------|--------------------------------------|
+| `minimax-cn` | `MiniMax-M3`, `MiniMax-M2.7` | YES |
+| `minimax` | `MiniMax-M3`, `MiniMax-M2.7` | YES |
+| các provider/ model khác | bất kỳ | no |
 
 ### Checklist sau merge upstream
 

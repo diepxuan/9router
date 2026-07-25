@@ -187,7 +187,7 @@ export function normalizeClaudePassthrough(body, model = "") {
 // - Fix tool_use/tool_result ordering
 // - Apply cloaking (billing header + fake user ID) for OAuth tokens
 export function prepareClaudeRequest(body, provider = null, apiKey = null, connectionId = null, rawHeaders = null, sessionId = null) {
-  // quirk: MiniMax's Claude-compatible endpoint rejects Anthropic's output_config (400 invalid params).
+  // quirk: MiniMax's Claude-compatible endpoint rejects Anthropic's output_config (400 invalid params)
   if (PROVIDERS[provider]?.quirks?.dropOutputConfig) {
     delete body.output_config;
   }
