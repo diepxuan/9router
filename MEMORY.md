@@ -74,6 +74,10 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 
 | Ngày | Sự kiện |
 |------|---------|
+| 2026-07-24 | PR #54: strip 3 Codex builtin tools + MiMo 441 cooldown + error observability (squash-merge) |
+| 2026-07-24 | PR #55: fix console-log right panel scroll |
+| 2026-07-24 | PR #53: NVIDIA strip unsupported `text` param |
+| 2026-07-24 | PR #52: NVIDIA tool_call_id sanitizer + MiniMax tool wrapper (fix 92% + 74% error rate) |
 | 2026-07-23 | PR #46 (fork DiepXuan → main), PR #51 (i18n vi combos + RR label) merged |
 | 2026-07-23 | Round Robin: key "Vòng tròn" → "Luân phiên" (chuẩn kỹ thuật) theo yêu cầu Sếp |
 | 2026-07-23 | vi.json: 196 → 201 keys, không sửa base file (runtime i18n) |
@@ -81,5 +85,5 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 | 2026-07-21 | Tách SOUL/IDENTITY/USER/TOOLS single source of truth (PR #44) |
 
 ### Phiên bản sau merge
-- main: v0.5.40 + fork layer (commit 1464cd94)
-- diepxuan: v0.5.40 + 12 fork commits
+- main: v0.5.40 + fork layer (commit b88a1ef3, PR #54/#55)
+- DiepXuan custom features: 17 manifest features (thêm §23 stripBuiltinTools, §24 MiMo cooldown, §25 observability)

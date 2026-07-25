@@ -1110,3 +1110,502 @@ Phần giải thích trong page `Combos` (`src/app/(dashboard)/dashboard/combos/
 
 - rev 1 (PR #50 commit `9aedad6c`): thêm 5 keys ban đầu, dùng "Round Robin" trong value.
 - rev 2 (sửa tiếp PR #50 hoặc PR mới): chuẩn hóa "Round Robin" key → "Luân phiên", thêm 3 keys cho STRATEGY_OPTIONS modal. Theo Sếp yêu cầu trực tiếp.
+
+---
+
+## 21. NVIDIA tool_call_id sanitizer — 2026-07-24 (MiniMax tool wrapper REMOVED 2026-07-25 — sai, convert sai tool format)
+
+### Mục đích
+
+Fix 2 lỗi 400 từ provider:
+1. **NVIDIA NIM** (92% failure rate, 399/432 requests) — tool_call_id không đúng pattern `[a-zA-Z0-9]{9}` (Anthropic cho phép underscore/hyphen, NVIDIA reject)
+2. **minimax-cn** (74% failure rate, 118/160 requests) — MiniMax M3 gateway reject Anthropic-shape tools, yêu cầu OpenAI-shape `{type:"function", function:{...}}`
+
+### Files fork layer
+
+```
+open-sse/diepxuan/nvidia/
+  cleanToolIds.js          -- Sanitize tool_call_ids → [a-zA-Z0-9]{9} cho NVIDIA
+                             + idMap để tool response dùng chung id với assistant tool_call
+open-sse/diepxuan/transformers/
+  wrapToolsForMinimax.js   -- anthropicToolsToOpenAI(): wrap Anthropic-shape tools về OpenAI-shape
+                             cho minimax-cn/minimax gateway
+```
+
+### Base files bị sửa
+
+| Base file | Thay đổi |
+|-----------|----------|
+| `open-sse/translator/index.js` | Import + gọi `sanitizeToolCallIdsForNvidia()` sau `ensureToolCallIds()`,
+                                import + gọi `wrapToolsForMinimax()` sau `prepareClaudeRequest()` |
+| `open-sse/translator/request/openai-to-claude.js` | Xoá dòng `type: "function"` (redundant — `wrapToolsForMinimax` handle) |
+
+### Vị trí hook trong pipeline
+
+**NVIDIA:**
+1. `ensureToolCallIds()` — base: đảm bảo mọi tool_call đều có id (Anthropic pattern `[a-zA-Z0-9_-]+`)
+2. `sanitizeToolCallIdsForNvidia()` — fork: rewrite id chưa đạt chuẩn NVIDIA về `[a-zA-Z0-9]{9}`
+3. Các bước format conversion tiếp theo
+
+**MiniMax:**
+1. Format conversion (vd openai→claude): tools chuyển từ OpenAI-shape sang Anthropic-shape
+2. `prepareClaudeRequest()`: chuẩn bị request cho Claude endpoint
+3. `wrapToolsForMinimax()` — fork: wrap tools về OpenAI-shape `{type:"function", function:{...}}`
+4. Dispatch đến gateway
+
+### idMap bug fix (2026-07-24)
+
+- **Triệu chứng:** tool response (`role: "tool"`) dùng id được sinh từ position khác với assistant tool_call → id lệch nhau → provider reject
+- **Nguyên nhân:** `sanitizeToolCallIdsForNvidia()` rewrite assistant tool_call_ids (dùng `msgIndex:tcIndex:toolName`) và tool response tool_call_ids (dùng `msgIndex:0:null`) độc lập → 2 id khác nhau
+- **Fix:** thêm `Map<oldId, newId>` trong cùng 1 pass, tool response lookup id từ map trước, fallback sang positional hash nếu không có mapping
+- **Verify:** unit test Test 4 (tool response) PASS — tool_call_id được rewrite với mapping
+
+### Guard flag
+
+Cả 2 hook đều wrap với `isDiepXuanEnabled()`:
+- `DIEPXUAN_ENABLED=false` → no-op (giữ nguyên hành vi upstream)
+- Không dùng `DIEPXUAN_SAFE_MODE` (chưa cần)
+
+### Provider filter
+
+- `sanitizeToolCallIdsForNvidia()`: chỉ chạy khi `provider === "nvidia"` (Set `NVIDIA_PROVIDER_IDS`)
+- `wrapToolsForMinimax()`: chỉ chạy khi `provider === "minimax-cn" || provider === "minimax"` (Set `TARGETS`)
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/nvidia/cleanToolIds.js
+test -f open-sse/diepxuan/transformers/wrapToolsForMinimax.js
+
+# Import còn nguyên trong base
+grep -q 'sanitizeToolCallIdsForNvidia' open-sse/translator/index.js
+grep -q 'wrapToolsForMinimax' open-sse/translator/index.js
+
+# Tool shape không còn type:function trong openai-to-claude
+grep -v 'type: "function"' open-sse/translator/request/openai-to-claude.js | grep -q 'name: toolName'
+
+# Syntax
+node --check open-sse/diepxuan/nvidia/cleanToolIds.js
+node --check open-sse/diepxuan/transformers/wrapToolsForMinimax.js
+node --check open-sse/translator/index.js
+```
+
+### Unit test
+
+```bash
+# NVIDIA sanitizer (13 tests)
+node --input-type=module </tmp/test_nvidia.js
+# Kỳ vọng: 13 PASS / 0 FAIL
+
+# MiniMax wrapper (20 tests)
+node --input-type=module </tmp/test_minimax.js
+# Kỳ vọng: 20 PASS / 0 FAIL
+
+# Translator integration (8 tests)
+node --input-type=module </tmp/test_translator_integration.js
+# Kỳ vọng: 8 PASS / 0 FAIL
+```
+
+### Smoke test khuyến nghị
+
+1. **NVIDIA** — Gọi proxy local với model NVIDIA + tool request:
+   ```bash
+   curl -s http://9router.diepxuan.corp:3000/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -d '{"model":"nvidia/llama-...","messages":[{"role":"user","content":"calc 2+2"},{"role":"assistant","content":"","tool_calls":[{"id":"test_123","type":"function","function":{"name":"calc","arguments":"{}"}}]}],"tools":[{"type":"function","function":{"name":"calc","parameters":{"type":"object"}}}]}'
+   ```
+   Kỳ vọng: 200 (không còn 400 vì tool_call_id có underscore)
+
+2. **minimax-cn** — Gọi proxy local với minimax-cn/MiniMax-M3 + tools:
+   ```bash
+   curl -s http://9router.diepxuan.corp:3000/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -d '{"model":"minimax-cn/MiniMax-M3","messages":[{"role":"user","content":"test"}],"tools":[{"type":"function","function":{"name":"test","parameters":{"type":"object","properties":{}}}}]}'
+   ```
+   Kỳ vọng: 200 (không còn 400 "function is empty (2013)")
+
+3. **non-MiniMax providers** — Gọi với minimax (không phải minimax-cn), agnes, openrouter → không ảnh hưởng
+
+### Verify đã chạy (2026-07-24)
+
+- `node --check`: 4 file PASS
+- `node scripts/diepxuan/check-custom-features.mjs`: 14 PASS / 0 WARN / 0 FAIL
+- Unit tests: 13/13 NVIDIA, 20/20 MiniMax, 8/8 translator integration — tổng 41/41 PASS
+- Code review: cleanToolIds.js + wrapToolsForMinimax.js — 2 review points fixed, reviewer confirm OK
+- DB snapshot trước merge: nvidia 92% fail, minimax-cn 74% fail
+
+### Tác động kỳ vọng
+
+Sau khi merge, tỷ lệ lỗi dự kiến:
+- NVIDIA: 92% → ~10-20% (chỉ còn rate limit / transient errors, không còn 400 tool_call_id)
+- minimax-cn: 74% → ~5-10% (chỉ còn rate limit / transient errors, không còn 400 "function is empty")
+- Các provider khác: không ảnh hưởng
+
+---
+
+## 22. NVIDIA NIM strip `text` param — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 từ NVIDIA NIM khi request chứa top-level parameter `text`:
+
+```
+❌ nvidia [400]: Validation: Unsupported parameter(s): `text`
+```
+
+### Nguyên nhân
+
+- Client (AI coding tool) gửi request kèm `text: {"verbosity":"low"}` — cấu hình verbosity, không phải input content.
+- NVIDIA NIM là OpenAI-compatible, chỉ chấp nhận params chuẩn (`model`, `messages`, `temperature`, `max_tokens`, `tools`...).
+- 9Router pass-through `text` nguyên vẹn → NVIDIA reject 400.
+
+### Nội dung `text` field (xác nhận qua DB query)
+
+| Item | Value |
+|------|-------|
+| `text` value | `{"verbosity":"low"}` |
+| Có phải input người dùng? | ❌ Không — input chat nằm trong `messages[]` |
+| Xoá có mất nội dung? | ❌ An toàn tuyệt đối |
+
+### Cách fix
+
+**Base file bị sửa:** `open-sse/translator/concerns/paramSupport.js`
+
+Thêm 1 rule vào `STRIP_RULES`:
+
+```js
+// NVIDIA NIM rejects unknown top-level params like `text: {"verbosity":"low"}`
+// (sent by some AI coding tools). Strip before dispatch to avoid 400.
+{ provider: "nvidia", drop: ["text"] },
+```
+
+### Cơ chế hoạt động
+
+1. `DefaultExecutor.transformRequest()` gọi `stripUnsupportedParams(provider, model, body)`.
+2. Rule match `provider === "nvidia"` (không filter model — áp dụng cho tất cả model NVIDIA).
+3. `delete body.text` nếu tồn tại.
+4. Request đến NVIDIA không còn `text` → pass validation.
+
+### Vị trí trong pipeline
+
+```
+translateRequest() → filterToOpenAIFormat() → stripUnsupportedParams() [fork: strip text] → injectReasoningContent() → executor.execute()
+```
+
+### So sánh với §17 (dead code)
+
+Section §17 mô tả `open-sse/diepxuan/executorHooks.js` (dead code — function `stripNvidiaUnsupportedParams` không ai gọi).
+Fix lần này khác:
+- **Không dùng fork layer** (`open-sse/diepxuan/**`).
+- **Dùng cơ chế có sẵn** `stripUnsupportedParams()` trong `paramSupport.js`, config-driven.
+- **Không cần guard flag** `isDiepXuanEnabled()` vì rule chỉ apply cho `provider === "nvidia"`, không ảnh hưởng upstream behavior.
+
+### File bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/translator/concerns/paramSupport.js` | Thêm 1 dòng rule `{ provider: "nvidia", drop: ["text"] }` vào `STRIP_RULES` |
+
+### Checklist sau merge upstream
+
+```bash
+# Rule còn nguyên trong paramSupport.js
+grep -q "provider: 'nvidia', drop: \\["text"\\]" open-sse/translator/concerns/paramSupport.js || grep -q 'provider: "nvidia", drop: \[\"text\"\]' open-sse/translator/concerns/paramSupport.js
+
+# Syntax check
+node --check open-sse/translator/concerns/paramSupport.js
+```
+
+### Smoke test khuyến nghị
+
+1. Gửi request đến NVIDIA có kèm `text` param:
+   ```bash
+   curl -s http://localhost:20128/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/minimaxai/minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":16,"text":{"verbosity":"low"}}'
+   ```
+   Kỳ vọng: 200 (không còn 400)
+
+2. Gửi request không có `text` — behavior không đổi:
+   ```bash
+   curl -s http://localhost:20128/v1/chat/completions \
+     -H "Authorization: Bearer $KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/minimaxai/minimax-m3","messages":[{"role":"user","content":"hi"}],"max_tokens":16}'
+   ```
+   Kỳ vọng: 200 như cũ
+
+## 23. Codex built-in tool pruner — minimax-cn/MiniMax-M3 — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 còn lại sau PR #52 (MiniMax tool wrapper) trên **combo cụ thể** `minimax-cn` + model `MiniMax-M3`:
+
+```
+400 "invalid params, function name is empty (2013)"
+```
+
+### DB snapshot (2026-07-24, sau PR #52)
+
+| Provider | Error | Success | Tỷ lệ lỗi |
+|---|---|---|---|
+| `minimax-cn` | 188 | 41 | **82%** |
+| `minimax` | 23 | 132 | 15% |
+
+Trong 188 lỗi của `minimax-cn`:
+- 147 × `function name is empty (2013)` (3 Codex built-in tools không có `name`)
+- 25 × `invalid tool type` (`type=custom`, `type=namespace`)
+- 12 × `function is empty` (object shape không khớp wrapper)
+- 4 lỗi account/key/quota (không liên quan)
+
+3 tool Codex-built-in thiếu `name`:
+
+```jsonc
+{ type: "tool_search" }
+{ type: "web_search" }
+{ type: "image_generation" }
+```
+
+`prepareClaudeRequest` filter (`claude.js` ~line 331) chỉ loại tools có `type !== "function"`. Khi wrapper ép về OpenAI-shape, không tìm được `name` nên gateway reject.
+
+### Cách fix
+
+Chỉ áp dụng cho **combo provider+model cụ thể**:
+- `provider === "minimax-cn"`
+- `model === "MiniMax-M3"`
+
+Các provider/model khác (kể cả `minimax` non-cn) pass-through nguyên vẹn — bảo toàn backward compatibility.
+
+### Files fork layer
+
+| File | Vai trò |
+|------|---------|
+| `open-sse/diepxuan/transformers/stripBuiltinTools.js` | Hook mới. Nhận `body` + `provider` + `model`, filter `tool_search`/`web_search`/`image_generation` khỏi `body.tools`. Khi rỗng → `delete body.tools`. |
+
+### Base files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/translator/index.js` | Import `stripBuiltinTools` + gọi `stripBuiltinTools(result, provider, model)` **trước** `wrapToolsForMinimax(result, provider)` |
+
+### Vị trí hook trong pipeline
+
+```
+translateRequest() → ... → stripBuiltinTools() [fork: prunes 3 nameless]  → wrapToolsForMinimax() [fork: opens]
+```
+
+> **CRITICAL:** Strip phải chạy **TRƯỚC** wrap. `wrapToolsForMinimax` chuyển đổi `type` field của tool (vd `"tool_search"` → `"function"`),
+> phá hủy identifier mà `stripBuiltinTools` cần để nhận diện. Bug này đã được phát hiện và sửa trong PR review.
+> Xem [review PR #54](https://github.com/diepxuan/9router/pull/54#discussion) để biết thêm chi tiết.
+
+### Provider filter (giữ nguyên sau PR #52)
+
+| Provider | Model | Filter nameless builtins? |
+|----------|-------|---------------------------|
+| `minimax-cn` | `MiniMax-M3` | YES (mục tiêu chính) |
+| `minimax-cn` | `MiniMax-M2.7` | no (còn ít lỗi, chưa đủ dữ liệu) |
+| `minimax` | bất kỳ | no (provider không trong TARGETS) |
+| các provider khác | bất kỳ | no |
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/transformers/stripBuiltinTools.js
+
+# Import + call còn nguyên trong base
+grep -q 'stripBuiltinTools' open-sse/translator/index.js
+
+# Targets chỉ liệt kê MiniMax-M3 combo
+grep -q '"minimax-cn": new Set(\["MiniMax-M3"\])' open-sse/diepxuan/transformers/stripBuiltinTools.js
+
+# Syntax
+node --check open-sse/diepxuan/transformers/stripBuiltinTools.js
+node --check open-sse/translator/index.js
+```
+
+### Unit test
+
+```bash
+# 12 PASS / 0 FAIL — see /tmp/test_stripBuiltinTools.mjs
+```
+
+Bao gồm 9/12 case (mix với Codex real payload 20 tool → 17 kept) + 3 edge case (`tools.length=0`, không có key, body all-nameless).
+
+### Smoke test khuyến nghị
+
+1. **Codex CLI với minimax-cn/MiniMax-M3**: request bình thường → kỳ vọng giảm lỗi 400 xuống dưới 10%.
+
+2. **Codex CLI với minimax-cn/MiniMax-M2.7**: behavior không đổi (chưa active).
+
+3. **non-Codex client với minimax-cn/MiniMax-M3**: behavior không đổi (không có 3 nameless tools để strip).
+
+### Tác động kỳ vọng
+
+| Provider | Trước | Sau (kỳ vọng) |
+|----------|-------|---------------|
+| `minimax-cn` MiniMax-M3 | 82% error | < 10% error |
+
+Phần lỗi còn lại là rate-limit / quota / thỉnh thoảng upstream validation — sẽ phân tích tiếp nếu Sếp yêu cầu.
+
+---
+
+## 24. MiMo Code Free (`mimo-free` / alias `mmf`) — parseError cooldown cho error 441 — 2026-07-24
+
+### Mục đích
+
+Fix lỗi 400 từ MiMo Code Free:
+
+```json
+{ "error": { "code": "441",
+             "message": "Detected high-frequency non-compliant requests from you. Please consciously comply with the platform usage agreement. If you need to appeal, contact us through the official website channels." } }
+```
+
+DB snapshot (2026-07-24, 5 giờ gần nhất):
+- 6 lỗi trong 1 giờ, 100% đều code 441, model `mimo-auto`, provider `mimo-free`.
+
+### Nguyên nhân
+
+`MimoFreeExecutor` base (`open-sse/executors/mimo-free.js`) đã handle `401`/`403` với retry-once-after-bootstrap, nhưng **không** handle code 441:
+- Status HTTP vẫn là 400 (không phải 429).
+- `parseError` chưa được định nghĩa ở base → `parseUpstreamError` trong `utils/error.js` rơi về JSON message extraction, **không** set `resetsAtMs`.
+- Combo fallback không skip → request lặp lại trong vài phút → ban tiếp.
+
+### Cách fix
+
+Fork-layer subclass `MimoFreeExecutor` và override `parseError(response, bodyText)`:
+- Nhận diện response 400 với `error.code === "441"`.
+- Trả `{ status: 429, message, resetsAtMs: Date.now() + 60*60*1000 }`.
+- Status 429 để combo fallback / connection cooldown skip.
+
+### Files fork layer
+
+| File | Vai trò |
+|------|---------|
+| `open-sse/diepxuan/executors/mimo-free.js` | Wrapper class `DiepxuanMimoFreeExecutor extends MimoFreeExecutor` + pure function `parseMimoFreeError(response, bodyText)` xuất để test/doc. |
+
+### Base files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/executors/index.js` | Import `DiepxuanMimoFreeExecutor` + chọn class theo `isDiepXuanEnabled()` cho 2 key `"mimo-free"` và `"mmf"`. Khi flag off → dùng base executor cũ byte-for-byte. |
+
+### Provider filter
+
+| Provider | Model | Active parseError? |
+|----------|-------|-------------------|
+| `mimo-free` | bất kỳ | YES (combo wrapper) |
+| `mmf` | bất kỳ | YES (alias → cùng class) |
+| các provider khác | bất kỳ | no |
+
+### Hardening
+
+- `MIMO_RATE_LIMIT_CODES = new Set(["441"])` — set lookup, dễ mở rộng sau (vd "442", "443" nếu upstream phát sinh).
+- `MIMO_COOLDOWN_MS = 60 * 60 * 1000` (1 giờ) — em đặt 1h vì upstream text nói "appeal through official website", retry trong 1h gần như chắc chắn fail.
+- Không throw exception trong `parseError` — luôn return `null` cho non-match cases → falls back to default message extraction → không phá vỡ upstream behavior.
+
+### Checklist sau merge upstream
+
+```bash
+# Files fork còn nguyên
+test -f open-sse/diepxuan/executors/mimo-free.js
+
+# Import + registry switch còn nguyên trong base
+grep -q 'DiepxuanMimoFreeExecutor' open-sse/executors/index.js
+grep -q 'isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor' open-sse/executors/index.js
+
+# Syntax
+node --check open-sse/diepxuan/executors/mimo-free.js
+node --check open-sse/executors/index.js
+```
+
+### Unit test
+
+```bash
+# 11 PASS / 0 FAIL — see /tmp/test_mimo_parser.mjs
+```
+
+Bao gồm: real upstream body, status 401, missing code, khác code, non-JSON, no `.error` key, null response, numeric `441`, empty `message`.
+
+### Smoke test khuyến nghị
+
+1. **Repeat request MiMo** trong cùng giờ — kỳ vọng request thứ 2 nhận `resetsAtMs` > hiện tại + 30 phút.
+2. **Request sau 1 giờ** — kỳ vọng trở lại behavior bình thường (re-bootstrap).
+3. **non-MiMo provider** không ảnh hưởng.
+
+### Lưu ý
+
+Đây là fix **client-side** về phía observability + cooldown. Nguyên nhân gốc (server ban vì high-frequency rate) nằm ở MiMo — không có fix code hoàn toàn từ phía 9Router. Nếu muốn giảm triệt để, cần throttle phía client (Codex CLI / dashboard).
+
+---
+
+## 25. Error observability — raw upstream body + structured error + messageCount — 2026-07-24
+
+### Mục đích
+
+Observability của error path trước PR này chỉ lưu `response.error = JSON-stringified message`. Khi Sếp phải debug lỗi MiniMax M3 400, root-cause analysis thiếu:
+- Raw upstream body (để so sánh nhiều error khác nhau).
+- Structured fields `error.type`, `error.code` (vd `invalid_request_error`, code `2013`) — bị strip khi extract `message`.
+- Conversation length — để group "short-thread failures" vs "long-thread failures".
+
+### Cách fix
+
+Bổ sung 3 thứ vào error path (không phá backward compat):
+
+1. `parseUpstreamError()` thêm 2 field return: `body` (string), `errorBody` (parsed JSON nếu là JSON, undefined nếu không).
+2. `chatCore.js` error path propagate 3 field mới vào `response` block:
+   - `response.body`: raw upstream body
+   - `response.errorBody`: parsed JSON
+   - `response.errorType`: `errorBody.error?.type || errorBody.type`
+   - `response.errorCode`: `errorBody.error?.code ?? errorBody.code`
+3. Top-level `messageCount` trong record `requestDetails` để query SQL dễ:
+   ```sql
+   SELECT COUNT(*) FROM requestDetails
+   WHERE json_extract(data, '$.messageCount') > 50
+         AND status='error' AND provider='minimax-cn';
+   ```
+
+### Files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/utils/error.js` | `parseUpstreamError` thêm return fields `body`, `errorBody` (extra, ignored by callers cũ) |
+| `open-sse/handlers/chatCore.js` | Error path propagate `body`, `errorBody`, `errorType`, `errorCode` + top-level `messageCount` |
+
+### Backward compatibility
+
+- `parseUpstreamError` signature không đổi — chỉ thêm field `body`/`errorBody`. Caller nào destructure `{statusCode, message}` thì vẫn nhận đúng giá trị cũ.
+- `chatCore.js` error path chỉ đổi nội bộ save `requestDetails` — không ảnh hưởng `createErrorResult` trả về client.
+- `truncateField` ở `requestDetailsRepo.js` đã có sẵn tự động truncate field > `observabilityMaxJsonSize` (default 5KB), nên `body` lớn không phình DB.
+
+### Không thêm test file
+
+Vì là observability enhancement, không có unit test deterministic. Verify bằng cách:
+1. Trigger 1 lỗi MiniMax M3 bất kỳ (qua Codex CLI).
+2. SQL query `requestDetails` tìm row mới nhất → kiểm tra `response.body`, `response.errorBody`, `messageCount` không null.
+
+### Smoke test khuyến nghị
+
+```bash
+# 1. Trigger lỗi (vd gửi MiniMax M3 + tools có tool_search)
+# 2. Query DB
+sqlite3 ~/.9router/db/data.sqlite "
+SELECT json_extract(data, '\$.response.errorCode') AS errCode,
+       json_extract(data, '\$.response.errorType') AS errType,
+       json_extract(data, '\$.messageCount') AS msgN
+FROM requestDetails
+WHERE provider='minimax-cn' AND model='MiniMax-M3' AND status='error'
+ORDER BY timestamp DESC LIMIT 3;
+"
+# Mong đợi: errCode='2013', errType='invalid_request_error', msgN=number
+```
+
+### Tác động
+
+- DB row size tăng ~1-2KB / row error (body). Tự truncate bởi repo. maxRecords mặc định 200 → không ảnh hưởng disk đáng kể.
+- Phase đầu fix observability — phase sau có thể thêm dashboard filter / alert theo `errorCode`.
+
+---
+

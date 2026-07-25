@@ -19,6 +19,11 @@ import { OllamaLocalExecutor } from "./ollama-local.js";
 import { CommandCodeExecutor } from "./commandcode.js";
 import { XiaomiTokenplanExecutor } from "./xiaomi-tokenplan.js";
 import { MimoFreeExecutor } from "./mimo-free.js";
+import { isDiepXuanEnabled } from "../../src/diepxuan/shared/config/flags.js";
+// diepxuan fork-layer: subclass that adds parseError() so 441 rate-limit
+// responses get a 1-hour cooldown. When DIEPXUAN_ENABLED=false, fall back to
+// the upstream executor byte-for-byte.
+import DiepxuanMimoFreeExecutor from "../diepxuan/executors/mimo-free.js";
 import { CodeBuddyExecutor } from "./codebuddy-cn.js";
 import { DefaultExecutor } from "./default.js";
 
@@ -47,8 +52,8 @@ const executors = {
   "ollama-local": new OllamaLocalExecutor(),
   commandcode: new CommandCodeExecutor(),
   "xiaomi-tokenplan": new XiaomiTokenplanExecutor(),
-  "mimo-free": new MimoFreeExecutor(),
-  mmf: new MimoFreeExecutor(), // Alias for mimo-free
+  "mimo-free": new (isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor)(),
+  mmf: new (isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor)(), // Alias for mimo-free
   "codebuddy-cn": new CodeBuddyExecutor(),
 };
 
