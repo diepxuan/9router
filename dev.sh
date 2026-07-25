@@ -100,6 +100,7 @@ manage_service() {
 [Unit]
 Description=9Router Development Server
 After=network.target
+Conflicts=${PROD_SERVICE_NAME}.service
 
 [Service]
 Type=simple
@@ -134,6 +135,10 @@ do_start() {
     # Cập nhật hosts
     update_hosts "add"
 
+    # Quan trọng: khi gọi qua dev.sh ta stop prod trước để nhường port 3000.
+    # Nếu Sếp (hoặc ai đó) khởi 9router-dev bằng `systemctl start ...` thì
+    # Conflicts=${PROD_SERVICE_NAME}.service bên dưới sẽ tự chặn khi prod
+    # còn đang active — bắt buộc stop thủ công trước.
     # Stop production service để tránh tranh port với dev service
     stop_prod_service
 
