@@ -1580,71 +1580,97 @@ Khi client gọi combo (vd `gpt-5.5` trỏ tới `minimax-cn/MiniMax-M3`):
 3. Translator trong SSE/OpenAI bridge truyền nguyên `model` đó xuống client.
 4. Codex CLI dùng `model` để render delimiter `modelname[>` cho output stream — kết quả là user thấy tên internal provider/model thay vì tên combo họ gọi, gây nhầm lẫn và khó debug.
 
-### Cách fix
+### Cách fix — fork-layer hook (KHÔNG sửa base signature)
 
-Capture tên model client gốc (`originalRequestedModel`) từ `clientRawRequest.body.model` hoặc `body.model` trước khi override. Truyền xuống làm `responseModel` qua:
+Thay vì truyền `responseModel` qua signature của các handler base (vi phạm AGENTS.md §6), em implement override hoàn toàn ở fork layer `open-sse/diepxuan/transformers/responseModelOverride.js` rồi wire vào `chatCore.js` (file đã có comment `// diepxuan:` từ trước — đã là fork file) thông qua post-process wrap:
 
-1. `chatCore.js` capture `originalRequestedModel` rồi truyền vào `handleNonStreamingResponse` / `handleStreamingResponse`.
-2. `nonStreamingHandler.js` set `translatedResponse.model = responseModel` sau khi `translateNonStreamingResponse`.
-3. `streamingHandler.js` truyền `responseModel` xuống `createSSETransformStreamWithLogger`.
-4. `utils/stream.js`:
-   - Thêm option `responseModel` cho `createSSEStream`.
-   - Sau `translateResponse` post-process tất cả chunk để override `item.model === responseModel` (tránh chunk đầu của `message_start` leak tên upstream).
-   - Restore `state.model` cho các lần `translateResponse` tiếp theo (cuối stream + flush).
-   - `createSSETransformStreamWithLogger` nhận thêm `responseModel` (tham số thứ 12) và set `model: responseModel || model`.
+1. **`captureOriginalRequestedModel(clientRawRequest, body)`** — lấy tên combo gốc từ `clientRawRequest.body.model` hoặc fallback `body.model`. Trả về `null` nếu fork flag tắt.
+2. **`applyResponseModelOverride(translatedResponse, originalModel)`** — patch model field trên object JSON (non-streaming case).
+3. **`wrapNonStreamingResponseWithModelOverride(response, originalModel)`** — async, clone response, parse JSON, override model, trả về Response mới.
+4. **`wrapResponseBodyWithModelOverride(response, originalModel)`** — wrap `response.body` (ReadableStream) bằng TransformStream parse SSE event-by-event, override model field trên mọi JSON payload (OpenAI top-level, Anthropic `message.model`, Responses API `response.model`), re-emit.
 
-### Files bị sửa
+### Wire points (chỉ trong `chatCore.js`)
 
-| File | Thay đổi |
-|------|----------|
-| `open-sse/handlers/chatCore.js` | Capture `originalRequestedModel` + truyền vào shared context |
-| `open-sse/handlers/chatCore/nonStreamingHandler.js` | Override `translatedResponse.model` sau translate |
-| `open-sse/handlers/chatCore/streamingHandler.js` | Truyền `responseModel` xuống transform stream builder |
-| `open-sse/utils/stream.js` | Option `responseModel` + post-process chunk + restore `state.model` |
+```js
+import { captureOriginalRequestedModel, wrapResponseBodyWithModelOverride, wrapNonStreamingResponseWithModelOverride } from "../diepxuan/transformers/responseModelOverride.js";
+
+const originalClientModel = captureOriginalRequestedModel(clientRawRequest, body);
+
+// Non-streaming
+const result = await handleNonStreamingResponse({ ...sharedCtx, ... });  // base handler signature KHÔNG đổi
+return { ...result, response: wrapNonStreamingResponseWithModelOverride(result.response, originalClientModel) };
+
+// Streaming
+const result = await handleStreamingResponse({ ...sharedCtx, ... });  // base handler signature KHÔNG đổi
+return { ...result, response: wrapResponseBodyWithModelOverride(result.response, originalClientModel) };
+```
+
+### Files
+
+| File | Vai trò | Sửa? |
+|------|---------|------|
+| `open-sse/diepxuan/transformers/responseModelOverride.js` | NEW — capture + wrap helpers (fork layer) | mới |
+| `open-sse/handlers/chatCore.js` | Wire hook: 1 import + 1 capture call + 2 wrap calls | 1 file base đã có marker `// diepxuan:` |
+| `open-sse/handlers/chatCore/nonStreamingHandler.js` | KHÔNG sửa | revert về main |
+| `open-sse/handlers/chatCore/streamingHandler.js` | KHÔNG sửa | revert về main |
+| `open-sse/utils/stream.js` | KHÔNG sửa | revert về main |
 
 ### Backward compatibility
 
-- `responseModel` là optional (default null). Khi null, code path cũ chạy y nguyên — không có post-process, không restore.
-- Signature của tất cả hàm public được mở rộng (thêm param cuối), không xóa/bớt param nào — caller cũ vẫn hoạt động.
-- `createSSETransformStreamWithLogger` thêm param mới thứ 12 `responseModel` — caller hiện tại trong repo truyền `null` cho slot mới, không vỡ.
+- Hook là no-op khi fork flag tắt (`isDiepXuanEnabled() === false`) → behavior y hệt base upstream.
+- Hook là no-op khi `originalClientModel === null` (vd request không qua combo) → không đụng response.
+- Hook là no-op khi model đã khớp (`translatedResponse.model === originalClientModel`) → không log overhead.
+- KHÔNG thêm param nào vào signature của base handler — toàn bộ logic override nằm trong fork layer.
+- Wrap làm tăng overhead tối thiểu: 1 lần `.clone()` + `.json()` cho non-streaming, 1 TransformStream passthrough cho streaming. SSE chunk size thường < 16 KB nên transform overhead không đáng kể.
 
 ### Vị trí hook trong pipeline
 
 ```
 request body (combo name)
-  -> chatCore capture originalRequestedModel
+  -> chatCore capture originalClientModel  (fork-layer import)
   -> combo resolve -> override body.model = "minimax-cn/MiniMax-M3"
   -> upstream provider response.model = "minimax-cn/MiniMax-M3"
-  -> translateResponse (state.model = "minimax-cn/MiniMax-M3")
-  -> POST-PROCESS: chunk.model = originalRequestedModel ("gpt-5.5")
-  -> client nhận model = "gpt-5.5"
+  -> base translateResponse (model = "minimax-cn/MiniMax-M3")
+  -> [FORK HOOK] wrap response.body with TransformStream
+       -> parse SSE event, override model field
+       -> client nhận model = "gpt-5.5"
 ```
 
 ### Smoke test khuyến nghị
 
 ```bash
-# 1. Start proxy
+# 1. Unit test (offline, không cần proxy)
+node --input-type=module -e '
+import { wrapResponseBodyWithModelOverride } from "./open-sse/diepxuan/transformers/responseModelOverride.js";
+const sse = new Response("data: {\"model\":\"minimax-cn/MiniMax-M3\"}\n\ndata: [DONE]\n\n");
+const out = await wrapResponseBodyWithModelOverride(sse, "gpt-5.5").text();
+console.assert(out.includes("\"model\":\"gpt-5.5\""));
+console.assert(out.includes("[DONE]"));
+console.log("unit smoke OK");
+'
+
+# 2. End-to-end (cần proxy + combo đang hoạt động)
 bash dev.sh start
-
-# 2. Gửi request combo qua Codex CLI (hoặc curl với model="gpt-5.5" trỏ tới MiniMax)
 curl -sS http://9router.diepxuan.corp:3000/v1/chat/completions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}],"stream":true}' \
-  | head -20
-# Mong đợi: tất cả SSE chunk có "model":"gpt-5.5" (không phải "minimax-cn/MiniMax-M3")
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}]}' | jq '.model'
+# Mong đợi: "gpt-5.5" (không phải "minimax-cn/MiniMax-M3")
 
-# 3. Non-stream tương tự
 curl -sS http://9router.diepxuan.corp:3000/v1/chat/completions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}]}' \
-  | jq '.model'
-# Mong đợi: "gpt-5.5"
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}],"stream":true}' | head -5
+# Mong đợi: mọi SSE chunk có "model":"gpt-5.5"
 ```
 
 ### Tác động
 
-- Chỉ áp dụng khi `body.model` ban đầu khác với model sau override (tức là request qua combo). Request model đơn (vd `gpt-4o`) → `originalRequestedModel` === resolved model → override là no-op.
-- Không ảnh hưởng request không-combo (vd gọi thẳng `minimax-cn/MiniMax-M3` → `originalRequestedModel` cũng là vậy, override no-op).
-- Không thêm file mới — chỉ sửa 4 file base. Vì vậy KHÔNG thêm entry vào `docs/custom-features.manifest.json` (manifest chỉ track file fork layer).
+- Chỉ áp dụng khi fork flag bật VÀ `originalClientModel !== resolvedModel` (tức là request qua combo). Request model đơn (vd `gpt-4o`) → `originalClientModel` === resolved model → override no-op.
+- Không ảnh hưởng request không-combo (vd gọi thẳng `minimax-cn/MiniMax-M3` → `originalClientModel` cũng là vậy, override no-op).
+- Khi fork flag tắt → behavior y hệt upstream gốc, không leak gì cả.
+
+### Lý do fork-layer hook thay vì base-file modification
+
+- AGENTS.md §6: "chỉ được viết trong layer fork (`src/diepxuan/`, `open-sse/diepxuan/`), tuyệt đối không sửa trực tiếp base file upstream."
+- Commit `d689dcfe` đầu tiên đã vi phạm §6 (sửa 4 file base). Commit này revert 3 file base và rewrite hoàn toàn bằng fork-layer hook. `chatCore.js` được giữ modification vì file đã có marker `// diepxuan:` từ trước (PR #54 — error observability), đã được accept là fork file trong commit `1464cd94`.
+- Trade-off: wrap post-processing tốn overhead parse JSON 1 lần mỗi chunk streaming (microseconds), nhưng giữ base files thuần upstream → rebase/merge từ upstream master không conflict.
+

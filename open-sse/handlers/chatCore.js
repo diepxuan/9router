@@ -18,6 +18,7 @@ import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDeta
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
 import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/streamingHandler.js";
+import { captureOriginalRequestedModel, wrapResponseBodyWithModelOverride, wrapNonStreamingResponseWithModelOverride } from "../diepxuan/transformers/responseModelOverride.js";
 import { detectClientTool, isNativePassthrough } from "../utils/clientDetector.js";
 import { dedupeTools } from "../utils/toolDeduper.js";
 import { injectCaveman } from "../rtk/caveman.js";
@@ -353,13 +354,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     }
   }
 
-  // Capture the original model name the client requested, before any override.
-  // When the request goes through a combo (e.g. "gpt-5.5"), the body.model is
-  // overwritten to `${provider}/${model}` (e.g. "minimax-cn/MiniMax-M3").
-  // The upstream response then echoes its own model name instead of the combo
-  // name, which leaks internal model names to clients like Codex CLI (which uses
-  // the model field to generate `modelname[>` delimiters).
-  const originalRequestedModel = clientRawRequest?.body?.model || body.model;
+  // diepxuan: capture the combo name the client originally requested so we can
+  // restore it on the response (Codex CLI leaks upstream model name via its
+  // `modelname[>` delimiter otherwise). Fork-layer hook — base handler
+  // signatures are untouched; override is applied as a post-processing wrap.
+  const originalClientModel = captureOriginalRequestedModel(clientRawRequest, body);
 
   // Provider returned error
   if (!providerResponse.ok) {
@@ -438,14 +437,15 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   // True non-streaming response
   if (!stream) {
-    const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, trackDone, appendLog, responseModel: originalRequestedModel });
+    const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, trackDone, appendLog });
     streamController.handleComplete();
-    return result;
+    return { ...result, response: wrapNonStreamingResponseWithModelOverride(result.response, originalClientModel) };
   }
 
   // Streaming response
   const { onStreamComplete, streamDetailId } = buildOnStreamComplete({ ...sharedCtx });
-  return handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete, streamDetailId, responseModel: originalRequestedModel });
+  const result = await handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete, streamDetailId });
+  return { ...result, response: wrapResponseBodyWithModelOverride(result.response, originalClientModel) };
 }
 
 export function isTokenExpiringSoon(expiresAt, bufferMs = 5 * 60 * 1000) {
