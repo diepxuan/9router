@@ -7,7 +7,7 @@
     "forkBranch": "main",
     "upstreamBranch": "master",
     "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
-    "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 (minimax-m3-strip-builtin-tools, mimo-free-parse-error-cooldown, error-observability-body-and-messagecount) -> 17 features."
+    "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 (minimax-m3-strip-builtin-tools, mimo-free-parse-error-cooldown, error-observability-body-and-messagecount) -> 17 features; 2026-07-26 added combo-response-model-override -> 18 features."
   },
   "features": [
     {
@@ -762,6 +762,41 @@
         "open-sse/utils/error.js",
         "open-sse/handlers/chatCore.js"
       ]
+    },
+    {
+      "id": "combo-response-model-override",
+      "description": "Override the model field in upstream responses with the combo name the client originally requested (e.g. \"gpt-5.5\" instead of \"minimax-cn/MiniMax-M3\"), so Codex CLI delimiter \\`modelname[>\\` renders the combo name and internal provider/model names do not leak. Fork-layer hook implementation: transformers/responseModelOverride.js captures the original client model and wraps the response body via TransformStream (streaming) or json-clone + rewrite (non-streaming). Backward-compatible: hook is a no-op when fork flag disabled or when originalClientModel === resolved model.",
+      "requiredPatterns": [
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "captureOriginalRequestedModel"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "wrapNonStreamingResponseWithModelOverride"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "wrapResponseBodyWithModelOverride"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "captureOriginalRequestedModel"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "wrapResponseBodyWithModelOverride"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "overrideModelInSseText"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/handlers/chatCore.js",
+        "open-sse/diepxuan/transformers/responseModelOverride.js"
+      ]
     }
-  ]
+  ],
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17 features; 2026-07-26 added combo-response-model-override (fork-layer hook rewrite) -> 18 features."
 }

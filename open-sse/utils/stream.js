@@ -48,7 +48,8 @@ export function createSSEStream(options = {}) {
     connectionId = null,
     body = null,
     onStreamComplete = null,
-    apiKey = null
+    apiKey = null,
+    responseModel = null  // Override for response model field (e.g. combo name)
   } = options;
 
   let buffer = "";
@@ -300,6 +301,26 @@ export function createSSEStream(options = {}) {
         // Translate: targetFormat -> openai -> sourceFormat
         const translated = translateResponse(targetFormat, sourceFormat, parsed, state);
 
+        // Override model in ALL translated chunks to prevent upstream model
+        // name leakage. The translator's message_start handler sets
+        // state.model = chunk.message?.model (e.g. "minimax/MiniMax-M3")
+        // and creates the first SSE chunk *before* the state restore below.
+        // Without this post-process, the very first chunk would carry the
+        // upstream model name to Codex CLI, which reads it for its own
+        // delimiter format (`modelname[>`).
+        if (responseModel && translated?.length > 0) {
+          for (const item of translated) {
+            if (item && item.model !== undefined && item.model !== responseModel) {
+              item.model = responseModel;
+            }
+          }
+        }
+
+        // Also restore state.model for subsequent translateResponse calls
+        if (responseModel && state?.model !== responseModel) {
+          state.model = responseModel;
+        }
+
         // Log OpenAI intermediate chunks (if available)
         if (translated?._openaiIntermediate) {
           for (const item of translated._openaiIntermediate) {
@@ -408,8 +429,12 @@ export function createSSEStream(options = {}) {
             }
           }
         }
-
         const flushed = translateResponse(targetFormat, sourceFormat, null, state);
+
+          // Restore response model after flush translation too
+          if (responseModel && state?.model !== responseModel) {
+            state.model = responseModel;
+          }
 
         if (flushed?._openaiIntermediate) {
           for (const item of flushed._openaiIntermediate) {
@@ -467,7 +492,7 @@ export function createSSEStream(options = {}) {
   });
 }
 
-export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, provider = null, reqLogger = null, toolNameMap = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null) {
+export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, provider = null, reqLogger = null, toolNameMap = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null, toolNameMapExtra = null, responseModel = null) {
   return createSSEStream({
     mode: STREAM_MODE.TRANSLATE,
     targetFormat,
@@ -475,11 +500,12 @@ export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, p
     provider,
     reqLogger,
     toolNameMap,
-    model,
+    model: responseModel || model,
     connectionId,
     body,
     onStreamComplete,
-    apiKey
+    apiKey,
+    responseModel  // Pass through for state.model restore after translation
   });
 }
 
