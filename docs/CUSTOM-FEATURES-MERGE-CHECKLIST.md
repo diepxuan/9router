@@ -1569,3 +1569,82 @@ ORDER BY timestamp DESC LIMIT 3;
 
 ---
 
+
+## 26. Combo response model override — chống leak internal model name cho Codex CLI — 2026-07-26
+
+### Mục đích
+
+Khi client gọi combo (vd `gpt-5.5` trỏ tới `minimax-cn/MiniMax-M3`):
+1. `body.model` bị ghi đè thành `${provider}/${model}` ở tầng routing để chuyển tới provider đúng.
+2. Provider upstream trả response với `model` field là tên của riêng nó (vd `minimax-cn/MiniMax-M3`).
+3. Translator trong SSE/OpenAI bridge truyền nguyên `model` đó xuống client.
+4. Codex CLI dùng `model` để render delimiter `modelname[>` cho output stream — kết quả là user thấy tên internal provider/model thay vì tên combo họ gọi, gây nhầm lẫn và khó debug.
+
+### Cách fix
+
+Capture tên model client gốc (`originalRequestedModel`) từ `clientRawRequest.body.model` hoặc `body.model` trước khi override. Truyền xuống làm `responseModel` qua:
+
+1. `chatCore.js` capture `originalRequestedModel` rồi truyền vào `handleNonStreamingResponse` / `handleStreamingResponse`.
+2. `nonStreamingHandler.js` set `translatedResponse.model = responseModel` sau khi `translateNonStreamingResponse`.
+3. `streamingHandler.js` truyền `responseModel` xuống `createSSETransformStreamWithLogger`.
+4. `utils/stream.js`:
+   - Thêm option `responseModel` cho `createSSEStream`.
+   - Sau `translateResponse` post-process tất cả chunk để override `item.model === responseModel` (tránh chunk đầu của `message_start` leak tên upstream).
+   - Restore `state.model` cho các lần `translateResponse` tiếp theo (cuối stream + flush).
+   - `createSSETransformStreamWithLogger` nhận thêm `responseModel` (tham số thứ 12) và set `model: responseModel || model`.
+
+### Files bị sửa
+
+| File | Thay đổi |
+|------|----------|
+| `open-sse/handlers/chatCore.js` | Capture `originalRequestedModel` + truyền vào shared context |
+| `open-sse/handlers/chatCore/nonStreamingHandler.js` | Override `translatedResponse.model` sau translate |
+| `open-sse/handlers/chatCore/streamingHandler.js` | Truyền `responseModel` xuống transform stream builder |
+| `open-sse/utils/stream.js` | Option `responseModel` + post-process chunk + restore `state.model` |
+
+### Backward compatibility
+
+- `responseModel` là optional (default null). Khi null, code path cũ chạy y nguyên — không có post-process, không restore.
+- Signature của tất cả hàm public được mở rộng (thêm param cuối), không xóa/bớt param nào — caller cũ vẫn hoạt động.
+- `createSSETransformStreamWithLogger` thêm param mới thứ 12 `responseModel` — caller hiện tại trong repo truyền `null` cho slot mới, không vỡ.
+
+### Vị trí hook trong pipeline
+
+```
+request body (combo name)
+  -> chatCore capture originalRequestedModel
+  -> combo resolve -> override body.model = "minimax-cn/MiniMax-M3"
+  -> upstream provider response.model = "minimax-cn/MiniMax-M3"
+  -> translateResponse (state.model = "minimax-cn/MiniMax-M3")
+  -> POST-PROCESS: chunk.model = originalRequestedModel ("gpt-5.5")
+  -> client nhận model = "gpt-5.5"
+```
+
+### Smoke test khuyến nghị
+
+```bash
+# 1. Start proxy
+bash dev.sh start
+
+# 2. Gửi request combo qua Codex CLI (hoặc curl với model="gpt-5.5" trỏ tới MiniMax)
+curl -sS http://9router.diepxuan.corp:3000/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}],"stream":true}' \
+  | head -20
+# Mong đợi: tất cả SSE chunk có "model":"gpt-5.5" (không phải "minimax-cn/MiniMax-M3")
+
+# 3. Non-stream tương tự
+curl -sS http://9router.diepxuan.corp:3000/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"hi"}]}' \
+  | jq '.model'
+# Mong đợi: "gpt-5.5"
+```
+
+### Tác động
+
+- Chỉ áp dụng khi `body.model` ban đầu khác với model sau override (tức là request qua combo). Request model đơn (vd `gpt-4o`) → `originalRequestedModel` === resolved model → override là no-op.
+- Không ảnh hưởng request không-combo (vd gọi thẳng `minimax-cn/MiniMax-M3` → `originalRequestedModel` cũng là vậy, override no-op).
+- Không thêm file mới — chỉ sửa 4 file base. Vì vậy KHÔNG thêm entry vào `docs/custom-features.manifest.json` (manifest chỉ track file fork layer).

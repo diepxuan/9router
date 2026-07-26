@@ -7,7 +7,7 @@
     "forkBranch": "main",
     "upstreamBranch": "master",
     "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
-    "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 (minimax-m3-strip-builtin-tools, mimo-free-parse-error-cooldown, error-observability-body-and-messagecount) -> 17 features."
+    "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 (minimax-m3-strip-builtin-tools, mimo-free-parse-error-cooldown, error-observability-body-and-messagecount) -> 17 features; 2026-07-26 added combo-response-model-override -> 18 features."
   },
   "features": [
     {
@@ -761,6 +761,42 @@
       "syntaxCheck": [
         "open-sse/utils/error.js",
         "open-sse/handlers/chatCore.js"
+      ]
+    },
+    {
+      "id": "combo-response-model-override",
+      "description": "Override the model field in upstream responses with the combo name the client originally requested (e.g. 'gpt-5.5' instead of 'minimax-cn/MiniMax-M3'), so Codex CLI delimiter `modelname[>` renders the combo name and internal provider/model names do not leak. Backward-compatible: responseModel is optional (null = no-op), all new params are appended to function signatures.",
+      "requiredPatterns": [
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "originalRequestedModel"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "responseModel: originalRequestedModel"
+        },
+        {
+          "file": "open-sse/handlers/chatCore/nonStreamingHandler.js",
+          "pattern": "translatedResponse\\.model = responseModel"
+        },
+        {
+          "file": "open-sse/handlers/chatCore/streamingHandler.js",
+          "pattern": "responseModel"
+        },
+        {
+          "file": "open-sse/utils/stream.js",
+          "pattern": "responseModel"
+        },
+        {
+          "file": "open-sse/utils/stream.js",
+          "pattern": "state\\.model = responseModel"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/handlers/chatCore.js",
+        "open-sse/handlers/chatCore/nonStreamingHandler.js",
+        "open-sse/handlers/chatCore/streamingHandler.js",
+        "open-sse/utils/stream.js"
       ]
     }
   ]
