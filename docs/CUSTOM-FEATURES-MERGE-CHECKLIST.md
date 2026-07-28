@@ -1802,3 +1802,69 @@ sqlite3 ~/.9router/db/data.sqlite \
 - Pattern đã có sẵn: `open-sse/diepxuan/contextLength/errorParser.js` (PR #53, 2026-07-23) extract `contextLength` từ 400 body. PR này dùng cùng pattern, mở rộng sang 429 với `extractLimitsFromError`.
 - Nếu sửa `open-sse/executors/base.js` parseError → conflict mỗi lần rebase upstream. Thay vào đó, em chỉ thêm 1 call ở `chatCore.js` (file đã accept là fork từ PR #54).
 - DB table namespace `_diepxuan` để không conflict khi rebase.
+
+---
+
+## 21. Rate-limit throttle engine (ADR-007 PR #61)
+
+**Phạm vi:** `open-sse/diepxuan/limits/{cache,window,throttle}.js`, sửa `open-sse/diepxuan/comboHooks.js`, `open-sse/services/combo.js`, `src/sse/handlers/chat.js`, `tests/unit/limits-throttle.test.mjs`.
+
+**Mục đích:** Wire throttle engine vào combo path. Sliding window counter persistent trong SQLite. Khi RPM/TPM/RPH/RPD vượt ngưỡng:
+- `policy: "wait-then-send"` (mặc định) → sleep tới oldest event rời window rồi gửi.
+- `policy: "reject-429"` hoặc `"fallback"` → return `{ skip: true, reason }`, combo skip sang model tiếp theo.
+
+**Files cần giữ:**
+
+- `open-sse/diepxuan/limits/cache.js` — `rate_limit_counters_diepxuan` table, read/push/clear
+- `open-sse/diepxuan/limits/window.js` — pure sliding-window math (count, sum, oldestAgeOutAt, projectedAgeOutAt)
+- `open-sse/diepxuan/limits/throttle.js` — `acquireQuotaSlot` (async), `recordRequestOutcome`, `estimateTokens`
+- `open-sse/diepxuan/comboHooks.js` — `beforeComboModelAttempt` (sync → async)
+- `open-sse/services/combo.js` — accept `{ response, ok, connectionId, ... }` callback shape (back-compat with legacy Response shape)
+- `src/sse/handlers/chat.js` — return wrapper `{ response, connectionId, promptTokens, completionTokens }` from `handleSingleModelChat`
+- `tests/unit/limits-throttle.test.mjs` — 14 unit tests
+
+**Tích hợp fork governance:**
+
+- `comboHooks.js` đã có marker `// diepxuan:` xung quanh (từ PR #54). Mở rộng trong cùng vùng.
+- `combo.js` chỉ thay đổi callback unwrap (legacy `Response` → `{ response, ... }`). Behavior 100% giống cũ.
+- `chat.js` sửa 2 return points để wrap kết quả. Caller (single-model) chỉ lấy `result.response`.
+- DB table `rate_limit_counters_diepxuan` tạo lazy. Namespace `_diepxuan` để không conflict.
+
+**Backward compat:**
+
+- Provider không khai báo `limits` → `acquireQuotaSlot` trả `{ acquired: true, limits: null }` → no-op.
+- `handleSingleModel` callback vẫn accept cả `Response` (legacy) lẫn `{ response, ... }` (new) — branch trong `combo.js`.
+- `beforeComboModelAttempt` sync → async. Caller duy nhất (`combo.js`) đã trong async for-loop, chỉ thêm `await`.
+
+**Checklist merge từ upstream master:**
+
+- [ ] `node --test tests/unit/limits-throttle.test.mjs` → 14/14 PASS
+- [ ] `node --test tests/unit/limits-resolution.test.mjs` → 22/22 PASS (no regression)
+- [ ] `node --test tests/unit/limits-auto-discovery.test.mjs` → 9/9 PASS (no regression)
+- [ ] `node scripts/diepxuan/check-custom-features.mjs` → ≥ 527 PASS (51 new checks)
+- [ ] `node --check` syntax tất cả file
+
+**Smoke test:**
+
+```bash
+# 1. Unit tests
+node --test tests/unit/limits-throttle.test.mjs
+# Mong đợi: 14/14 PASS
+
+# 2. Manual: spam 50 calls to a model with limits
+#    (After registry declares a model with rpm: 10, this becomes observable)
+sqlite3 ~/.9router/db/data.sqlite \
+  "SELECT * FROM rate_limit_counters_diepxuan WHERE scope LIKE '%nvidia%' LIMIT 5"
+```
+
+**Tác động:**
+
+- PR này bật **throttle thật sự** lần đầu. Khi registry khai báo `limits` cho model, combo tự throttle.
+- Hiện tại (PR #61) chưa có model nào khai báo `limits` → behavior y hệt cũ. PR #62 sẽ thêm limits cho NVIDIA NIM + free providers.
+- Combo thêm 1 layer "wait" trước khi gửi (cap 90s mặc định). User cảm nhận: request lâu hơn ~1-5s khi quota sắp đầy.
+
+**Lý do fork-layer:**
+
+- Pattern ổn định: comboHooks.js đã là fork file (PR #54). Mở rộng tại chỗ.
+- `combo.js` và `chat.js` chỉ thay đổi callback unwrap (compat). 1-2 dòng diff mỗi file.
+- DB table `_diepxuan` namespace riêng → rebase upstream không conflict.

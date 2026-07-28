@@ -128,7 +128,8 @@ export async function handleChat(request, clientRawRequest = null) {
   }
 
   // Single model request
-  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  const result = await handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  return result.response || result;
 }
 
 /**
@@ -269,7 +270,14 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       }
     });
 
-    if (result.success) return result.response;
+    if (result.success) {
+      return {
+        response: result.response,
+        connectionId: credentials.connectionId,
+        promptTokens: result.usage?.prompt_tokens || 0,
+        completionTokens: result.usage?.completion_tokens || 0,
+      };
+    }
 
     // Mark account unavailable (auto-calculates cooldown with exponential backoff, or precise resetsAtMs)
     const { shouldFallback } = await markAccountUnavailable(credentials.connectionId, result.status, result.error, provider, model, result.resetsAtMs);
@@ -282,6 +290,11 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       continue;
     }
 
-    return result.response;
+    return {
+      response: result.response,
+      connectionId: credentials.connectionId,
+      promptTokens: result.usage?.prompt_tokens || 0,
+      completionTokens: result.usage?.completion_tokens || 0,
+    };
   }
 }

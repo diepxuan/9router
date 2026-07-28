@@ -61,7 +61,7 @@
       "invariants": [
         {
           "file": "open-sse/services/combo.js",
-          "pattern": "beforeComboModelAttempt\\(\\{\\s*modelStr,\\s*comboName,\\s*log\\s*\\}\\)"
+          "pattern": "beforeComboModelAttempt\\(\\{"
         },
         {
           "file": "open-sse/services/combo.js",
@@ -807,15 +807,36 @@
         "tests/unit/limits-auto-discovery.test.mjs"
       ],
       "requiredPatterns": [
-        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "maybeRecordLimitsFromUpstreamError" },
-        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "extractLimitsFromError" },
-        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "initAutoDiscoveredLimitsTable" },
-        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "CREATE TABLE IF NOT EXISTS" },
-        { "file": "open-sse/handlers/chatCore.js", "pattern": "maybeRecordLimitsFromUpstreamError" },
-        { "file": "open-sse/handlers/chatCore.js", "pattern": "diepxuan/limits/autoDiscoverHook" }
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
+          "pattern": "maybeRecordLimitsFromUpstreamError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
+          "pattern": "extractLimitsFromError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "initAutoDiscoveredLimitsTable"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "CREATE TABLE IF NOT EXISTS"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "maybeRecordLimitsFromUpstreamError"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "diepxuan/limits/autoDiscoverHook"
+        }
       ],
       "invariants": [
-        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "isDiepXuanEnabled" }
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
+          "pattern": "isDiepXuanEnabled"
+        }
       ],
       "syntaxCheck": [
         "open-sse/diepxuan/limits/autoDiscoverHook.js",
@@ -835,18 +856,48 @@
         "tests/unit/limits-resolution.test.mjs"
       ],
       "requiredPatterns": [
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getResolvedLimits" },
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "mergeLimits" },
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getProviderLimits" },
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getModelLimits" },
-        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "getAutoDiscoveredLimits" },
-        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "initAutoDiscoveredLimitsTable" },
-        { "file": "open-sse/diepxuan/limits/errorParser.js", "pattern": "extractLimitsFromError" },
-        { "file": "open-sse/diepxuan/limits/inference.js", "pattern": "inferLimitsFromContext" }
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getResolvedLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "mergeLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getProviderLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getModelLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "getAutoDiscoveredLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "initAutoDiscoveredLimitsTable"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/errorParser.js",
+          "pattern": "extractLimitsFromError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/inference.js",
+          "pattern": "inferLimitsFromContext"
+        }
       ],
       "invariants": [
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "isDiepXuanEnabled" },
-        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "mergeLimits" }
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "mergeLimits"
+        }
       ],
       "syntaxCheck": [
         "open-sse/diepxuan/limits/index.js",
@@ -855,7 +906,93 @@
         "open-sse/diepxuan/limits/inference.js",
         "tests/unit/limits-resolution.test.mjs"
       ]
+    },
+    {
+      "id": "limit-throttle-engine",
+      "description": "Rate-limit throttle engine: sliding-window counters (persistent in SQLite) + acquireQuotaSlot wired into comboHooks. PR #61 of ADR-007. Uses wait-then-send by default; respects maxWaitMs cap.",
+      "requiredFiles": [
+        "open-sse/diepxuan/limits/cache.js",
+        "open-sse/diepxuan/limits/window.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/services/combo.js",
+        "src/sse/handlers/chat.js",
+        "tests/unit/limits-throttle.test.mjs"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "initRateLimitCountersTable"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "readPrunedEvents"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "pushEvent"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/window.js",
+          "pattern": "oldestAgeOutAt"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/window.js",
+          "pattern": "projectedAgeOutAt"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "acquireQuotaSlot"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "recordRequestOutcome"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "estimateTokens"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "acquireQuotaSlot"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "async function beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "await beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "wrapped"
+        },
+        {
+          "file": "src/sse/handlers/chat.js",
+          "pattern": "connectionId: credentials.connectionId"
+        }
+      ],
+      "invariants": [
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "isDiepXuanEnabled"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/limits/cache.js",
+        "open-sse/diepxuan/limits/window.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/services/combo.js",
+        "src/sse/handlers/chat.js",
+        "tests/unit/limits-throttle.test.mjs"
+      ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 20 features (limit-metadata-resolution #59 + limit-auto-discovery #60)."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 21 features (added limit-throttle-engine #61) (limit-metadata-resolution #59 + limit-auto-discovery #60)."
 }

@@ -250,27 +250,39 @@ export async function handleComboChat({ body, models, handleSingleModel, log, co
   for (let i = 0; i < rotatedModels.length; i++) {
     const modelStr = rotatedModels[i];
 
-    if (beforeComboModelAttempt({ modelStr, comboName, log }).skip) {
+    if ((await beforeComboModelAttempt({ modelStr, comboName, log, body })).skip) {
       continue;
     }
 
     log.info("COMBO", `Trying model ${i + 1}/${rotatedModels.length}: ${modelStr}`);
 
     try {
-      const result = await handleSingleModel(body, modelStr);
-      afterComboModelAttempt({ modelStr, comboName, ok: result.ok });
+      const wrapped = await handleSingleModel(body, modelStr);
+      // handleSingleModel may return either:
+      //   - a Response (legacy shape) — extract ok + status
+      //   - { response, ok, status, statusText, connectionId, promptTokens, completionTokens } (new shape, PR #61)
+      const response = wrapped && wrapped.response !== undefined ? wrapped.response : wrapped;
+      const ok = response && typeof response.ok === "boolean" ? response.ok : (wrapped && wrapped.ok);
+      const status = response && response.status !== undefined ? response.status : (wrapped && wrapped.status);
+      const statusText = response && response.statusText ? response.statusText : (wrapped && wrapped.statusText) || "";
+      afterComboModelAttempt({
+        modelStr, comboName, ok: !!ok,
+        promptTokens: (wrapped && wrapped.promptTokens) || 0,
+        completionTokens: (wrapped && wrapped.completionTokens) || 0,
+        connectionId: (wrapped && wrapped.connectionId) || null,
+      });
 
       // Success (2xx) - return response
-      if (result.ok) {
-        log.info("COMBO", `Model ${modelStr} succeeded`);
-        return result;
+      if (ok) {
+        log.info("COMBO", "Model " + modelStr + " succeeded");
+        return response;
       }
 
       // Extract error info from response
-      let errorText = result.statusText || "";
+      let errorText = statusText || "";
       let retryAfter = null;
       try {
-        const errorBody = await result.clone().json();
+        const errorBody = await response.clone().json();
         errorText = errorBody?.error?.message || errorBody?.error || errorBody?.message || errorText;
         retryAfter = errorBody?.retryAfter || null;
       } catch {
@@ -288,11 +300,11 @@ export async function handleComboChat({ body, models, handleSingleModel, log, co
       }
 
       // Check if should fallback to next model
-      const { shouldFallback, cooldownMs } = checkFallbackError(result.status, errorText, undefined, modelStr);
+      const { shouldFallback, cooldownMs } = checkFallbackError(status, errorText, undefined, modelStr);
 
       if (!shouldFallback) {
-        log.warn("COMBO", `Model ${modelStr} failed (no fallback)`, { status: result.status });
-        return result;
+        log.warn("COMBO", "Model " + modelStr + " failed (no fallback)", { status: status });
+        return response;
       }
 
       // Fallback to the next combo model immediately. The account/model layer is
@@ -301,9 +313,9 @@ export async function handleComboChat({ body, models, handleSingleModel, log, co
       // This is especially important for transient 502/503/504 and timeout errors.
 
       // Fallback to next model
-      lastError = errorText || String(result.status);
-      if (!lastStatus) lastStatus = result.status;
-      log.warn("COMBO", `Model ${modelStr} failed, trying next`, { status: result.status });
+      lastError = errorText || String(status);
+      if (!lastStatus) lastStatus = status;
+      log.warn("COMBO", "Model " + modelStr + " failed, trying next", { status: status });
     } catch (error) {
       // Catch unexpected exceptions to ensure fallback continues
       lastError = error.message || String(error);
