@@ -798,6 +798,32 @@
       ]
     },
     {
+      "id": "limit-auto-discovery",
+      "description": "Auto-discover rate-limit metadata from upstream 429 responses. PR #60 of ADR-007. Hooks into chatCore.js error path; UPSERTs to auto_discovered_limits_diepxuan table.",
+      "requiredFiles": [
+        "open-sse/diepxuan/limits/autoDiscoverHook.js",
+        "open-sse/diepxuan/limits/autoDiscovery.js",
+        "open-sse/handlers/chatCore.js",
+        "tests/unit/limits-auto-discovery.test.mjs"
+      ],
+      "requiredPatterns": [
+        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "maybeRecordLimitsFromUpstreamError" },
+        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "extractLimitsFromError" },
+        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "initAutoDiscoveredLimitsTable" },
+        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "CREATE TABLE IF NOT EXISTS" },
+        { "file": "open-sse/handlers/chatCore.js", "pattern": "maybeRecordLimitsFromUpstreamError" },
+        { "file": "open-sse/handlers/chatCore.js", "pattern": "diepxuan/limits/autoDiscoverHook" }
+      ],
+      "invariants": [
+        { "file": "open-sse/diepxuan/limits/autoDiscoverHook.js", "pattern": "isDiepXuanEnabled" }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/limits/autoDiscoverHook.js",
+        "open-sse/handlers/chatCore.js",
+        "tests/unit/limits-auto-discovery.test.mjs"
+      ]
+    },
+    {
       "id": "limit-metadata-resolution",
       "description": "Rate-limit metadata resolution engine (5-tier precedence: connection > model > provider > auto-discovered > inferred). PR #59 of ADR-007.",
       "requiredFiles": [
@@ -831,5 +857,5 @@
       ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 19 features."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 20 features (limit-metadata-resolution #59 + limit-auto-discovery #60)."
 }

@@ -131,20 +131,93 @@ export function getAutoDiscoveredLimits(connectionId, provider, model) {
 }
 
 /**
- * UPSERT auto-discovered limits. Implementation lives in PR #60 — declared
- * here so the public API stays stable across PRs.
+ * UPSERT auto-discovered limits into the local cache table.
+ *
+ * Conflict policy: if a previous record already exists for the same
+ * (connectionId, provider, model) AND the new limits are EXACTLY equal to
+ * the old ones, we just bump hitCount + update lastSeenAt. If the new
+ * limits differ, we KEEP the FIRST observation and log a warning — this
+ * protects against flaky extractor parses picking up unrelated numbers
+ * (e.g. a per-day counter inside an hourly error message).
+ *
+ * Returns true on write, false on no-op (caller may log).
  *
  * @param {{
  *   connectionId: string, provider: string, model: string,
  *   limits: { rpm?: number, tpm?: number, rph?: number, rpd?: number, concurrency?: number },
  *   evidence: string,
  * }} args
- * @returns {boolean} true if written, false on conflict or no-op
+ * @returns {boolean}
  */
 export function recordAutoDiscoveredLimits({ connectionId, provider, model, limits, evidence }) {
-  if (!isDiepXuanEnabled() || !connectionId) return false;
-  // Defer to PR #60 (write path needs init + insert). PR #59 keeps this as a
-  // documented stub so callers can wire without crashing.
-  void provider; void model; void limits; void evidence;
-  return false;
+  if (!isDiepXuanEnabled() || !connectionId || !provider || !model) return false;
+  const db = getDb();
+  if (!db) return false;
+  // Sanity: at least one numeric field is present
+  const has = (v) => Number.isFinite(v) && v > 0;
+  const rpm = has(limits.rpm) ? Math.floor(limits.rpm) : null;
+  const tpm = has(limits.tpm) ? Math.floor(limits.tpm) : null;
+  const rph = has(limits.rph) ? Math.floor(limits.rph) : null;
+  const rpd = has(limits.rpd) ? Math.floor(limits.rpd) : null;
+  const concurrency = has(limits.concurrency) ? Math.floor(limits.concurrency) : null;
+  if (rpm == null && tpm == null && rph == null && rpd == null && concurrency == null) {
+    return false; // no usable values
+  }
+
+  // Make sure the table exists (first-ever call from a fresh fork)
+  try { initAutoDiscoveredLimitsTable(); } catch (_) { /* ignore */ }
+
+  const now = Date.now();
+  try {
+    const existing = db.prepare(
+      `SELECT rpm, tpm, rph, rpd, concurrency, hitCount FROM ${TABLE_NAME}
+       WHERE connectionId = ? AND provider = ? AND model = ?`
+    ).get(connectionId, provider, model);
+
+    if (!existing) {
+      db.prepare(
+        `INSERT INTO ${TABLE_NAME}(
+           connectionId, provider, model, rpm, tpm, rph, rpd, concurrency,
+           source, evidence, firstSeenAt, lastSeenAt, hitCount
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+      ).run(
+        connectionId, provider, model, rpm, tpm, rph, rpd, concurrency,
+        "auto-429-detection",
+        String(evidence || "").slice(0, 500),
+        now, now,
+      );
+      return true;
+    }
+
+    // Conflict guard: if any observed field differs, log + keep first.
+    const changed = (
+      (rpm != null && existing.rpm != null && rpm !== existing.rpm) ||
+      (tpm != null && existing.tpm != null && tpm !== existing.tpm) ||
+      (rph != null && existing.rph != null && rph !== existing.rph) ||
+      (rpd != null && existing.rpd != null && rpd !== existing.rpd) ||
+      (concurrency != null && existing.concurrency != null && concurrency !== existing.concurrency)
+    );
+    if (changed) {
+      // First observation wins. Bump hitCount anyway so we can spot noisy
+      // signals later via the dashboard.
+      db.prepare(
+        `UPDATE ${TABLE_NAME} SET hitCount = hitCount + 1, lastSeenAt = ?
+         WHERE connectionId = ? AND provider = ? AND model = ?`
+      ).run(now, connectionId, provider, model);
+      return false;
+    }
+
+    // Same values — bump hitCount (proves reliable) and refresh lastSeenAt.
+    db.prepare(
+      `UPDATE ${TABLE_NAME}
+       SET hitCount = hitCount + 1, lastSeenAt = ?, evidence = ?
+       WHERE connectionId = ? AND provider = ? AND model = ?`
+    ).run(now, String(evidence || "").slice(0, 500), connectionId, provider, model);
+    return true;
+  } catch (err) {
+    if (process.env.DIEPXUAN_DEBUG) {
+      console.warn("[AutoDiscoveredLimits] write failed:", err?.message || err);
+    }
+    return false;
+  }
 }
