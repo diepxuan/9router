@@ -796,7 +796,40 @@
         "open-sse/handlers/chatCore.js",
         "open-sse/diepxuan/transformers/responseModelOverride.js"
       ]
+    },
+    {
+      "id": "limit-metadata-resolution",
+      "description": "Rate-limit metadata resolution engine (5-tier precedence: connection > model > provider > auto-discovered > inferred). PR #59 of ADR-007.",
+      "requiredFiles": [
+        "open-sse/diepxuan/limits/index.js",
+        "open-sse/diepxuan/limits/autoDiscovery.js",
+        "open-sse/diepxuan/limits/errorParser.js",
+        "open-sse/diepxuan/limits/inference.js",
+        "open-sse/diepxuan/limits/README.md",
+        "tests/unit/limits-resolution.test.mjs"
+      ],
+      "requiredPatterns": [
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getResolvedLimits" },
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "mergeLimits" },
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getProviderLimits" },
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "getModelLimits" },
+        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "getAutoDiscoveredLimits" },
+        { "file": "open-sse/diepxuan/limits/autoDiscovery.js", "pattern": "initAutoDiscoveredLimitsTable" },
+        { "file": "open-sse/diepxuan/limits/errorParser.js", "pattern": "extractLimitsFromError" },
+        { "file": "open-sse/diepxuan/limits/inference.js", "pattern": "inferLimitsFromContext" }
+      ],
+      "invariants": [
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "isDiepXuanEnabled" },
+        { "file": "open-sse/diepxuan/limits/index.js", "pattern": "mergeLimits" }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/limits/index.js",
+        "open-sse/diepxuan/limits/autoDiscovery.js",
+        "open-sse/diepxuan/limits/errorParser.js",
+        "open-sse/diepxuan/limits/inference.js",
+        "tests/unit/limits-resolution.test.mjs"
+      ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17 features; 2026-07-26 added combo-response-model-override (fork-layer hook rewrite) -> 18 features."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 19 features."
 }
