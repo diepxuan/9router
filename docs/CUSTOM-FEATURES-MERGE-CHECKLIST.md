@@ -1739,3 +1739,66 @@ DIEPXUAN_ENABLED=false node -e '
 - Pattern đã có sẵn ở `open-sse/diepxuan/contextLength/` (PR #53). Engine này dùng cùng pattern (lazy DB, fork flag guard, pure function test).
 - Nếu sửa `open-sse/executors/base.js` hoặc `open-sse/services/combo.js` trực tiếp → vi phạm AGENTS.md §6 + conflict mỗi lần rebase upstream.
 - Thay vào đó, PR #60+ sẽ thêm 1 dòng `import` + 1 dòng call vào base file (tối đa 1-2 dòng diff mỗi base file) — chấp nhận được, giống `sanitizeToolCallIdsForNvidia` ở PR #52.
+
+---
+
+## 20. Auto-discover rate limits from upstream 429 (ADR-007 PR #60)
+
+**Phạm vi:** `open-sse/diepxuan/limits/autoDiscoverHook.js`, sửa `open-sse/diepxuan/limits/autoDiscovery.js` + `open-sse/handlers/chatCore.js`, `tests/unit/limits-auto-discovery.test.mjs`.
+
+**Mục đích:** Khi upstream trả 429, tự động extract rate-limit hints (RPM/TPM/RPH/RPD) từ headers hoặc body, UPSERT vào table `auto_discovered_limits_diepxuan`. Lần sau, `getResolvedLimits` tự dùng limit đã học — không cần user config thủ công.
+
+**Files cần giữ sau rebase:**
+
+- `open-sse/diepxuan/limits/autoDiscoverHook.js` — pure-function hook, no-op khi fork flag off
+- `open-sse/diepxuan/limits/autoDiscovery.js` — implementation `recordAutoDiscoveredLimits` (UPSERT + conflict guard)
+- `open-sse/handlers/chatCore.js` — chỉ thêm 1 import + 1 hook call (~10 dòng diff)
+- `tests/unit/limits-auto-discovery.test.mjs` — 9 unit tests
+
+**Tích hợp fork governance:**
+
+- Hook đặt **sau** `parseUpstreamError` (line ~378) — vẫn nằm trong vùng đã marker `// diepxuan:` (PR #54, 2026-07-24). File này đã accept là fork file.
+- Hook là pure no-op khi `isDiepXuanEnabled()` false. Behavior 100% giống upstream gốc.
+- DB table `auto_discovered_limits_diepxuan` tạo lazy ở lần gọi đầu. Không tự init khi startup.
+
+**Conflict policy** (quan trọng để hiểu):
+
+- First observation wins. Nếu lần thứ 2 extract được value khác lần 1 → **giữ lần 1**, chỉ bump `hitCount`. Reason: regex parser có thể bắt nhầm số trong error body (vd "100/day" trong message thực ra là usage chứ không phải limit).
+- Same value lặp lại → bump `hitCount` (proves reliable). Dashboard sẽ dùng `hitCount` để hiển thị "đã học 5 lần, độ tin cậy cao".
+
+**Checklist merge từ upstream master:**
+
+- [ ] `node --test tests/unit/limits-auto-discovery.test.mjs` → 9/9 PASS
+- [ ] `node --test tests/unit/limits-resolution.test.mjs` → 22/22 PASS (no regression)
+- [ ] `node scripts/diepxuan/check-custom-features.mjs` → ≥ 476 PASS (24 checks mới)
+- [ ] `node --check` syntax tất cả file mới/sửa
+- [ ] Test `DIEPXUAN_ENABLED=false`: hook returns false, không ghi DB (tested manually)
+
+**Smoke test:**
+
+```bash
+# 1. Unit tests
+node --test tests/unit/limits-auto-discovery.test.mjs
+# Mong đợi: 9/9 PASS
+
+# 2. Manifest check
+node scripts/diepxuan/check-custom-features.mjs | tail -3
+# Mong đợi: PASS: 476 / WARN: 0 / FAIL: 0
+
+# 3. Manual: trigger a 429 to a known model and check the cache fills
+#    (after PR #61 wires the actual throttle, this becomes part of e2e)
+sqlite3 ~/.9router/db/data.sqlite \
+  "SELECT * FROM auto_discovered_limits_diepxuan WHERE provider='nvidia' AND model='z-ai/glm-5.2' LIMIT 5"
+```
+
+**Tác động:**
+
+- PR này bật **auto-learning**. Sau khi user gặp 1 lỗi 429 với `Requests limit = 40 / minute`, table sẽ ghi `{rpm: 40, hitCount: 1, source: "auto-429-detection"}`. Lần sau `getResolvedLimits` thấy limit này, trả về cho executor.
+- PR này **chưa throttle** — chỉ ghi nhận. Throttle thật sự ở PR #61 (`acquireQuotaSlot` + `beforeComboModelAttempt` async).
+- User không cần làm gì. Limit tự xuất hiện trong dashboard sau lỗi 429 đầu tiên.
+
+**Lý do fork-layer:**
+
+- Pattern đã có sẵn: `open-sse/diepxuan/contextLength/errorParser.js` (PR #53, 2026-07-23) extract `contextLength` từ 400 body. PR này dùng cùng pattern, mở rộng sang 429 với `extractLimitsFromError`.
+- Nếu sửa `open-sse/executors/base.js` parseError → conflict mỗi lần rebase upstream. Thay vào đó, em chỉ thêm 1 call ở `chatCore.js` (file đã accept là fork từ PR #54).
+- DB table namespace `_diepxuan` để không conflict khi rebase.

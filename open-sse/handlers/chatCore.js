@@ -15,6 +15,8 @@ import { trackPendingRequest, appendRequestLog, saveRequestDetail } from "@/lib/
 import { getExecutor } from "../executors/index.js";
 import { supportsGrokCliReasoningEffort } from "../config/grokCli.js";
 import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDetail.js";
+// diepxuan: auto-discover rate-limit metadata from 429 responses (ADR-007 PR #60).
+import { maybeRecordLimitsFromUpstreamError } from "../diepxuan/limits/autoDiscoverHook.js";
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
 import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/streamingHandler.js";
@@ -372,6 +374,16 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
       body: upstreamBody,
       errorBody: upstreamErrorBody,
     } = await parseUpstreamError(providerResponse, executor);
+    // diepxuan: auto-record upstream rate-limit hints (ADR-007 PR #60). Pure
+    // no-op when fork flag off or when extractor cannot parse the body.
+    maybeRecordLimitsFromUpstreamError({
+      status: statusCode,
+      response: providerResponse,
+      body: upstreamBody ?? upstreamErrorBody,
+      connectionId,
+      provider,
+      model,
+    });
     // diepxuan: surface conversation length so we can group "long-thread" vs
     // "short-thread" failure modes in observability (see `2026-07-24` log).
     const messageCount = Array.isArray(translatedBody?.messages)
