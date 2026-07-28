@@ -1674,3 +1674,68 @@ curl -sS http://9router.diepxuan.corp:3000/v1/chat/completions \
 - Commit `d689dcfe` đầu tiên đã vi phạm §6 (sửa 4 file base). Commit này revert 3 file base và rewrite hoàn toàn bằng fork-layer hook. `chatCore.js` được giữ modification vì file đã có marker `// diepxuan:` từ trước (PR #54 — error observability), đã được accept là fork file trong commit `1464cd94`.
 - Trade-off: wrap post-processing tốn overhead parse JSON 1 lần mỗi chunk streaming (microseconds), nhưng giữ base files thuần upstream → rebase/merge từ upstream master không conflict.
 
+
+---
+
+## 19. Rate-limit metadata resolution engine (ADR-007 PR #59)
+
+**Phạm vi:** `open-sse/diepxuan/limits/`, `tests/unit/limits-resolution.test.mjs`, ADR tại `docs/UPDATE-2026-07-28.md`.
+
+**Mục đích:** Engine phân giải metadata rate-limit (RPM/TPM/RPH/RPD/concurrency) cho mỗi (provider, model, connection) theo thứ tự ưu tiên 5 tầng: connection > model > provider > auto-discovered > inferred. Cho phép throttle chủ động (chờ rồi gửi) thay vì phản ứng khi upstream trả 429.
+
+**Files cần giữ sau rebase:**
+- `open-sse/diepxuan/limits/index.js` — public API + 5-tier resolver
+- `open-sse/diepxuan/limits/autoDiscovery.js` — DB layer cho `auto_discovered_limits_diepxuan` (read + init, write stub cho PR #60)
+- `open-sse/diepxuan/limits/errorParser.js` — pure extract limits từ 429 headers/body
+- `open-sse/diepxuan/limits/inference.js` — heuristic từ `limit.context`
+- `open-sse/diepxuan/limits/README.md` — module overview
+- `tests/unit/limits-resolution.test.mjs` — 22 unit tests
+- `docs/UPDATE-2026-07-28.md` — ADR
+
+**Tích hợp với fork governance:**
+
+- Module mới nằm hoàn toàn trong `open-sse/diepxuan/limits/` (đúng §6: chỉ viết fork layer).
+- Tất cả public API đều có guard `isDiepXuanEnabled()` — khi fork flag tắt, return `null` (no-op, hành vi y hệt upstream gốc).
+- DB table `auto_discovered_limits_diepxuan` đặt trong `~/.9router/db/data.sqlite` (cùng file với main DB) — nếu fork flag tắt, table không tạo → zero impact.
+
+**Checklist merge từ upstream master:**
+
+- [ ] Không upstream file nào bị sửa — module mới self-contained.
+- [ ] `node scripts/diepxuan/check-custom-features.mjs` → ≥ 452 PASS (36 checks mới cho feature này).
+- [ ] `node --test tests/unit/limits-resolution.test.mjs` → 22/22 PASS.
+- [ ] `node --check` syntax tất cả file mới.
+- [ ] ADR tại `docs/UPDATE-2026-07-28.md` còn nguyên (chỉ update khi có breaking change ở 5-tier precedence).
+
+**Smoke test:**
+
+```bash
+# 1. Unit tests
+node --test tests/unit/limits-resolution.test.mjs
+# Mong đợi: 22/22 PASS
+
+# 2. Custom features check
+node scripts/diepxuan/check-custom-features.mjs
+# Mong đợi: 452 PASS / 0 WARN / 0 FAIL
+
+# 3. Behavior unchanged khi fork flag off
+DIEPXUAN_ENABLED=false node -e '
+  import("/data/9router/open-sse/diepxuan/limits/index.js").then(m => {
+    console.log("with flag off:");
+    console.log("  getProviderLimits:", m.getProviderLimits("nvidia"));
+    console.log("  getResolvedLimits:", m.getResolvedLimits({provider:"nvidia",model:"z-ai/glm-5.2"}));
+  });
+'
+# Mong đợi: getProviderLimits=null, getResolvedLimits=null
+```
+
+**Tác động:**
+
+- PR #59 chỉ thêm code, KHÔNG thay đổi hành vi proxy. Tất cả provider chưa khai báo `limits` → resolve trả `null` → no throttle.
+- PR #60 (tiếp theo) sẽ wire `errorParser` vào `BaseExecutor.parseError` hook để auto-record khi gặp 429 lần đầu.
+- PR #61 sẽ wire `acquireQuotaSlot` vào `beforeComboModelAttempt` (chuyển từ sync → async) để throttle chủ động.
+
+**Lý do fork-layer:**
+
+- Pattern đã có sẵn ở `open-sse/diepxuan/contextLength/` (PR #53). Engine này dùng cùng pattern (lazy DB, fork flag guard, pure function test).
+- Nếu sửa `open-sse/executors/base.js` hoặc `open-sse/services/combo.js` trực tiếp → vi phạm AGENTS.md §6 + conflict mỗi lần rebase upstream.
+- Thay vào đó, PR #60+ sẽ thêm 1 dòng `import` + 1 dòng call vào base file (tối đa 1-2 dòng diff mỗi base file) — chấp nhận được, giống `sanitizeToolCallIdsForNvidia` ở PR #52.
