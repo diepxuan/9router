@@ -14,6 +14,7 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { handleComboChat, getComboModelsFromData } from "open-sse/services/combo.js";
 import { assertPublicUrl } from "@/shared/utils/ssrfGuard.js";
+import { handleDiepXuanWebComboFallback } from "@/diepxuan/sse/webComboFallback.js";
 
 /**
  * Handle web fetch (URL extraction) request for the SSE/Next.js server.
@@ -61,11 +62,6 @@ export async function handleFetch(request) {
     }
   }
 
-  if (!providerInput || typeof providerInput !== "string") {
-    log.warn("FETCH", "Missing provider/model");
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: provider (or model)");
-  }
-
   if (!targetUrl || typeof targetUrl !== "string") {
     log.warn("FETCH", "Missing url");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: url");
@@ -89,21 +85,25 @@ export async function handleFetch(request) {
 
   // Combo expansion: providerInput may be a combo name → run fallback/round-robin across providers
   const combos = await getCombos();
-  const comboModels = getComboModelsFromData(providerInput, combos);
-  if (comboModels) {
-    const comboStrategies = settings.comboStrategies || {};
-    const comboStrategy = comboStrategies[providerInput]?.fallbackStrategy || settings.comboStrategy || "fallback";
-    const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-    log.info("FETCH", `Combo "${providerInput}" with ${comboModels.length} providers (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
-    return handleComboChat({
-      body,
-      models: comboModels,
-      handleSingleModel: (b, m) => handleSingleProviderFetch(b, m, request, apiKey, settings),
-      log,
-      comboName: providerInput,
-      comboStrategy,
-      comboStickyLimit
-    });
+  const providerId = providerInput && typeof providerInput === "string" ? resolveProviderId(providerInput) : null;
+  const resolvedProvider = providerId ? AI_PROVIDERS[providerId] : null;
+  const customComboResponse = await handleDiepXuanWebComboFallback({
+    body,
+    providerInput,
+    combos,
+    kind: "webFetch",
+    resolvedProvider,
+    settings,
+    handleComboChat,
+    handleSingleModel: (b, m) => handleSingleProviderFetch(b, m, request, apiKey, settings),
+    log,
+    logScope: "FETCH",
+  });
+  if (customComboResponse) return customComboResponse;
+
+  if (!providerInput || typeof providerInput !== "string") {
+    log.warn("FETCH", "No provider/model specified and no webFetch combo available");
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, "No provider/model specified and no webFetch combo available");
   }
 
   return handleSingleProviderFetch(body, providerInput, request, apiKey, settings);
