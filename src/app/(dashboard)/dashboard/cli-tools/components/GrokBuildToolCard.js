@@ -5,6 +5,7 @@ import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/comp
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
+import { getCliToolBaseUrl } from "@/diepxuan/app/dashboard/cli-tools/baseUrl";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
 
@@ -152,9 +153,7 @@ export default function GrokBuildToolCard({
   }, [isExpanded, checkStatus, fetchModelAliases]);
 
   const getEffectiveBaseUrl = () => {
-    const url = customBaseUrl || (typeof window !== "undefined"
-      ? window.location.origin.replace("://localhost", "://127.0.0.1")
-      : "http://127.0.0.1:20128");
+    const url = customBaseUrl || getCliToolBaseUrl({ fallback: "http://127.0.0.1:20128" });
     return url.endsWith("/v1") ? url : `${url}/v1`;
   };
 
