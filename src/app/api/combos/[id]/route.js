@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
 import { getComboById, updateCombo, deleteCombo, getComboByName } from "@/lib/localDb";
 import { resetComboRotation } from "open-sse/services/combo.js";
 
@@ -21,6 +22,13 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Failed to fetch combo" }, { status: 500 });
   }
 }
+  // diepxuan: enrich with runtime context length
+  const ctxMap = getContextLengthBatchCached((combo.models || []));
+  combo.modelContexts = (combo.models || []).map(m => ({
+    id: m,
+    ctx: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
+  }));
+  combo.minContextLength = Math.min(...combo.modelContexts.filter(m => m.ctx).map(m => m.ctx)) || null;
 
 // PUT /api/combos/[id] - Update combo
 export async function PUT(request, { params }) {

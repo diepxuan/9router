@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
 import { getCombos, createCombo, getComboByName } from "@/lib/localDb";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,15 @@ export const dynamic = "force-dynamic";
 const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
 
 // GET /api/combos - Get all combos
+// diepxuan: enrich model list with runtime context length
+  function enrichModels(models) {
+    if (!Array.isArray(models) || models.length === 0) return [];
+    const ctxMap = getContextLengthBatchCached(models);
+    return models.map(m => ({
+      id: m,
+      ctx: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
+    }));
+  }
 export async function GET() {
   try {
     const combos = await getCombos();

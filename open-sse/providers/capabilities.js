@@ -1,3 +1,4 @@
+import { getContextLengthSync } from "../diepxuan/contextLength/index.js";
 // Model capabilities — what each model can read/do beyond plain text.
 //
 // Fallback order (first match wins), result merged over DEFAULT_CAPABILITIES:
@@ -315,30 +316,45 @@ export const PATTERN_CAPABILITIES = [
  * @param {string} model
  * @returns {object} full capabilities object
  */
-export function getCapabilitiesForModel(provider, model) {
-  if (!model) return { ...DEFAULT_CAPABILITIES };
 
-  // Canonical exact lookup strips vendor prefix: "anthropic/claude-opus-4.7" -> "claude-opus-4.7".
+export function getCapabilitiesForModel(provider, model) {
+  if (!model) return enrichCtx({ ...DEFAULT_CAPABILITIES });
+
+  // Canonical exact lookup strips vendor prefix.
   const baseModel = model.includes("/") ? model.split("/").pop() : model;
 
   // 1. Provider-specific override
   if (provider) {
-    const providerCaps = PROVIDER_CAPABILITIES[provider];
-    if (providerCaps?.[model]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[model] };
-    if (providerCaps?.[baseModel]) return { ...DEFAULT_CAPABILITIES, ...providerCaps[baseModel] };
+    const pc = PROVIDER_CAPABILITIES[provider];
+    if (pc?.[model]) return enrichCtx({ ...DEFAULT_CAPABILITIES, ...pc[model] }, model);
+    if (pc?.[baseModel]) return enrichCtx({ ...DEFAULT_CAPABILITIES, ...pc[baseModel] }, model);
   }
 
   // 2. Canonical exact
-  if (MODEL_CAPABILITIES[baseModel]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[baseModel] };
-  if (MODEL_CAPABILITIES[model]) return { ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[model] };
+  if (MODEL_CAPABILITIES[baseModel]) return enrichCtx({ ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[baseModel] }, model);
+  if (MODEL_CAPABILITIES[model]) return enrichCtx({ ...DEFAULT_CAPABILITIES, ...MODEL_CAPABILITIES[model] }, model);
 
   // 3. Pattern match (first match wins)
   for (const { pattern, caps } of PATTERN_CAPABILITIES) {
     if (matchPattern(pattern, baseModel) || matchPattern(pattern, model)) {
-      return { ...DEFAULT_CAPABILITIES, ...caps };
+      return enrichCtx({ ...DEFAULT_CAPABILITIES, ...caps }, model);
     }
   }
 
-  // 4. Floor
-  return { ...DEFAULT_CAPABILITIES };
+  // 4. Floor + runtime context_length override
+  return enrichCtx({ ...DEFAULT_CAPABILITIES }, model);
+}
+
+/**
+ * Enrich capabilities with runtime context_length from the context length cache.
+ * Cache is populated from: API fetch, error parse, static MODEL_INFO.
+ * This allows context length to be updated dynamically without code changes.
+ */
+function enrichCtx(caps, model) {
+  if (!model) return caps;
+  const ctx = getContextLengthSync(model);
+  if (typeof ctx === "number" && ctx > 0) {
+    caps.contextWindow = ctx;
+  }
+  return caps;
 }

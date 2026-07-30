@@ -17,6 +17,8 @@ import { resolveCursorModels } from "open-sse/services/cursorModels.js";
 import { updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 import { capabilitiesFromServiceKind, getCapabilitiesForModel } from "open-sse/providers/capabilities.js";
+import { resolveProviderModelsWithContext } from "open-sse/diepxuan/contextLength/modelsApi.js";
+import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
 
 // Per-provider live model resolvers. Each receives a connection record and
 // returns { models: [{ id, name? }, ...] } | null on failure.
@@ -104,6 +106,11 @@ const LIVE_MODEL_RESOLVERS = {
       providerSpecificData: conn.providerSpecificData || {},
     }, { log: console });
     return result?.models?.length ? { models: result.models } : null;
+  },
+  // diepxuan: NVIDIA NIM live catalog with context_length
+  nvidia: async (conn) => {
+    const result = await resolveProviderModelsWithContext(conn);
+    return result?.models?.length ? result : null;
   }
 };
 
@@ -352,10 +359,10 @@ export async function buildModelsList(kindFilter, options = {}) {
         ? Array.from(
             new Set(
               enabledModels.filter(
-                (modelId) => typeof modelId === "string" && modelId.trim() !== "",
-              ),
+              (modelId) => typeof modelId === "string" && modelId.trim() !== "",
             ),
-          )
+          ),
+        )
         : providerModels.map((model) => model.id);
 
       if (isCompatibleProvider && rawModelIds.length === 0 && !skipDynamicFetch) {
@@ -494,9 +501,18 @@ export async function buildModelsList(kindFilter, options = {}) {
 
   const dedupedModels = [];
   const seenModelIds = new Set();
+  // diepxuan: enrich with context_length for LLM models
+  const contextLengths = getContextLengthBatchCached(models.map((m) => m?.id).filter(Boolean));
   for (const model of models) {
     if (!model?.id || seenModelIds.has(model.id)) continue;
     seenModelIds.add(model.id);
+    if (model.object === "model") {
+      const cached = contextLengths.get(model.id);
+      const contextLength = cached?.contextLength || getStaticContextLength(model.id);
+      if (typeof contextLength === "number" && contextLength > 0) {
+        model.context_length = contextLength;
+      }
+    }
     dedupedModels.push(model);
   }
 

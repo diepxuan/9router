@@ -56,6 +56,12 @@ export default function ComboDetailPage() {
   const [showPicker, setShowPicker] = useState(false);
   const [logs, setLogs] = useState([]);
   const [testing, setTesting] = useState(false);
+function formatCtx(n) {
+  if (!n || typeof n !== "number") return "";
+  if (n >= 1048576) return `${(n / 1048576).toFixed(0)}M ctx`;
+  if (n >= 1024) return `${Math.round(n / 1024)}K ctx`;
+  return `${n} ctx`;
+}
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -260,6 +266,7 @@ export default function ComboDetailPage() {
           <div className="min-w-0">
             <p className="text-xs text-text-muted">{kindLabel} Combo</p>
             <code className="text-lg font-semibold font-mono">{combo.name}</code>
+            {combo.minContextLength ? <span className="inline-flex items-center gap-1 rounded bg-black/[0.04] dark:bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-text-muted font-mono mt-0.5">{formatCtx(combo.minContextLength)} min</span> : null}
           </div>
         </div>
         <Button variant="outline" icon="delete" onClick={handleDelete} className="text-red-500 border-red-200 hover:bg-red-50">
@@ -299,6 +306,11 @@ export default function ComboDetailPage() {
             No providers yet.
           </div>
         ) : (
+                  {(() => {
+                    const ctxMap = new Map((combo?.modelContexts || []).map(mc => [mc.id, mc.ctx]));
+                    const ctx = ctxMap.get(entry);
+                    return ctx ? <span className="text-[10px] text-text-muted ml-1 shrink-0">({formatCtx(ctx)})</span> : null;
+                  })()}
           <div className="flex flex-col gap-2">
             {providers.map((entry, idx) => {
               const { providerId, model } = parseModelEntry(entry);
