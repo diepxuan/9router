@@ -18,6 +18,7 @@ import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDeta
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
 import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/streamingHandler.js";
+import { captureOriginalRequestedModel, wrapResponseBodyWithModelOverride, wrapNonStreamingResponseWithModelOverride } from "../diepxuan/transformers/responseModelOverride.js";
 import { detectClientTool, isNativePassthrough } from "../utils/clientDetector.js";
 import { dedupeTools } from "../utils/toolDeduper.js";
 import { injectCaveman } from "../rtk/caveman.js";
@@ -353,6 +354,12 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     }
   }
 
+  // diepxuan: capture the combo name the client originally requested so we can
+  // restore it on the response (Codex CLI leaks upstream model name via its
+  // `modelname[>` delimiter otherwise). Fork-layer hook — base handler
+  // signatures are untouched; override is applied as a post-processing wrap.
+  const originalClientModel = captureOriginalRequestedModel(clientRawRequest, body);
+
   // Provider returned error
   if (!providerResponse.ok) {
     trackPendingRequest(model, provider, connectionId, false, true);
@@ -392,12 +399,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (!stream) {
     const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, reqLogger, toolNameMap, trackDone, appendLog });
     streamController.handleComplete();
-    return result;
+    return { ...result, response: wrapNonStreamingResponseWithModelOverride(result.response, originalClientModel) };
   }
 
   // Streaming response
   const { onStreamComplete, streamDetailId } = buildOnStreamComplete({ ...sharedCtx });
-  return handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete, streamDetailId });
+  const result = await handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat: providerResponseFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete, streamDetailId });
+  return { ...result, response: wrapResponseBodyWithModelOverride(result.response, originalClientModel) };
 }
 
 export function isTokenExpiringSoon(expiresAt, bufferMs = 5 * 60 * 1000) {
