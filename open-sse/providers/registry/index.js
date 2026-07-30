@@ -100,6 +100,16 @@ import p97 from "./xiaomi-tokenplan.js";
 import p98 from "./youcom.js";
 import p99 from "./alims-intl.js";
 
+// DiepXuan fork-layer providers (namespace dN to avoid upstream pN renumber conflicts)
+import d1 from "../../diepxuan/registry/agnes.js";
+import d2 from "../../diepxuan/registry/tokenrouter.js";
+import d3 from "../../diepxuan/registry/zenmux.js";
+import d4 from "../../diepxuan/registry/aihubmix.js";
+import d5 from "../../diepxuan/registry/groq.js";
+import d6 from "../../diepxuan/registry/nvidia.js";
+import d7 from "../../diepxuan/registry/qoder.js";
+import d8 from "../../diepxuan/registry/minimax.js";
+import d9 from "../../diepxuan/registry/minimax-cn.js";
 export default [
   p0,
   p1,
@@ -197,8 +207,14 @@ export default [
   p93,
   p94,
   p95,
-  p96,
-  p97,
-  p98,
-  p99,
+
+  d1,
+  d2,
+  d3,
+  d4,
+  d5,
+  d6,
+  d7,
+  d8,
+  d9,
 ];

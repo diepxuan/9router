@@ -120,11 +120,19 @@ export const PROVIDER_CAPABILITIES = {
   // NVIDIA NIM is OpenAI-compatible → rejects MiniMax/GLM native `thinking` field.
   // Force openai reasoning_effort format for its reasoning models. #issue
   "nvidia": {
-    "minimaxai/minimax-m2.7": { reasoning: true, thinkingFormat: "openai", thinkingCanDisable: false, contextWindow: 200000, maxOutput: 131072 },
     "minimaxai/minimax-m3": { vision: true, reasoning: true, thinkingFormat: "openai", thinkingCanDisable: false, contextWindow: 512000, maxOutput: 131072 },
     "z-ai/glm-5.2": { reasoning: true, thinkingFormat: "openai", contextWindow: 200000, maxOutput: 128000 },
     "deepseek-ai/deepseek-v4-pro": { reasoning: true, thinkingFormat: "openai", contextWindow: 1000000, maxOutput: 65536 },
     "deepseek-ai/deepseek-v4-flash": { reasoning: true, thinkingFormat: "openai", contextWindow: 1000000, maxOutput: 65536 },
+  },
+  // Groq is OpenAI-compatible → rejects Qwen/MiniMax native `thinking`/`reasoning_content` fields.
+  // Force openai reasoning_effort format for Groq-hosted reasoning models.
+  // Verified via https://api.groq.com/openai/v1/models on 2026-07-30.
+  "groq": {
+    // qwen/qwen3.6-27b matched as pattern *qwen3.6* → thinkingFormat "qwen" → enable_thinking rejected.
+    "qwen/qwen3.6-27b":  { reasoning: true, thinkingFormat: "openai", contextWindow: 131072, maxOutput: 16384 },
+    // minimaxai/minimax-m2.7 matched as pattern *minimax* → thinkingFormat "minimax" → thinking + reasoning_content rejected.
+    "minimaxai/minimax-m2.7": { reasoning: true, thinkingFormat: "openai", thinkingCanDisable: false, contextWindow: 200000, maxOutput: 48000 },
   },
   "codex": {
     "gpt-5.6-sol":               CODEX_GPT_56_SOL_CAPS,
