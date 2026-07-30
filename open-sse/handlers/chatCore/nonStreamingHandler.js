@@ -198,7 +198,7 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
 /**
  * Handle non-streaming response from provider.
  */
-export async function handleNonStreamingResponse({ providerResponse, provider, model, sourceFormat, targetFormat, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, reqLogger, toolNameMap, trackDone, appendLog, pxpipe, reqTag, log }) {
+export async function handleNonStreamingResponse({ providerResponse, provider, model, sourceFormat, targetFormat, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, reqLogger, toolNameMap, trackDone, appendLog, pxpipe, reqTag, log, responseModel }) {
   trackDone();
   const contentType = providerResponse.headers.get("content-type") || "";
   let responseBody;
@@ -241,6 +241,15 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
   const translatedResponse = needsTranslation(targetFormat, sourceFormat)
     ? translateNonStreamingResponse(responseBody, targetFormat, sourceFormat)
     : responseBody;
+
+  // Override the model field in the response to match what the client requested.
+  // When the request goes through a combo (e.g. "gpt-5.5" → MiniMax-M3), the
+  // upstream response carries its own model name ("minimax/MiniMax-M3"). This
+  // leaks the internal model name to clients like Codex CLI, which uses the
+  // model field for its delimiter format `modelname[>`.
+  if (responseModel && translatedResponse?.model) {
+    translatedResponse.model = responseModel;
+  }
   const isClaudeMessageResponse = sourceFormat === FORMATS.CLAUDE && translatedResponse?.type === "message";
 
   // Fix finish_reason for tool_calls: some providers return non-standard values (e.g. "other")

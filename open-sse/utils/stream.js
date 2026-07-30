@@ -48,7 +48,8 @@ export function createSSEStream(options = {}) {
     connectionId = null,
     body = null,
     onStreamComplete = null,
-    apiKey = null
+    apiKey = null,
+    responseModel = null  // Override for response model field (e.g. combo name)
   } = options;
 
   let buffer = "";
@@ -100,12 +101,29 @@ export function createSSEStream(options = {}) {
 
         // Passthrough mode: normalize and forward
         if (mode === STREAM_MODE.PASSTHROUGH) {
+          // Strip SSE comment lines (e.g. NVIDIA telemetry `: {...}`)
+          // if (trimmed && !trimmed.startsWith("data:")) continue;
+
           let output;
           let injectedUsage = false;
+          /** Whether the current line was successfully parsed as JSON data */
+          let parsedDataLine = false;
+          let parsed;
 
           if (trimmed.startsWith("data:") && trimmed.slice(5).trim() !== "[DONE]") {
+            parsedDataLine = true;
             try {
-              const parsed = JSON.parse(trimmed.slice(5).trim());
+              parsed = JSON.parse(trimmed.slice(5).trim());
+
+              // ── Override model FIRST, before any output construction ──
+              // This must run before the finish-chunk / injected-field / no-injection
+              // output branches below, so output always carries the corrected model.
+              // Without this, the outer wrap (wrapResponseBodyWithModelOverride) is
+              // the sole safety net, and chunk-boundary edge cases can leak the
+              // upstream model name before the outer wrap gets a chance to patch it.
+              if (responseModel && typeof parsed.model === "string" && parsed.model !== responseModel) {
+                parsed.model = responseModel;
+              }
 
               const idFixed = fixInvalidId(parsed);
 
@@ -190,10 +208,17 @@ export function createSSEStream(options = {}) {
           }
 
           if (!injectedUsage) {
-            if (line.startsWith("data:") && !line.startsWith("data: ")) {
-              output = "data: " + line.slice(5) + "\n";
+            // For successfully-parsed data lines, output the overridden parsed object
+            // (model was corrected at the top of the try block). For non-data lines
+            // (event:, :comments, empty, [DONE]) forward the raw line as-is.
+            if (parsedDataLine && parsed) {
+              output = `data: ${JSON.stringify(parsed)}\n`;
             } else {
-              output = line + "\n";
+              if (line.startsWith("data:") && !line.startsWith("data: ")) {
+                output = "data: " + line.slice(5) + "\n";
+              } else {
+                output = line + "\n";
+              }
             }
           }
 
@@ -297,6 +322,22 @@ export function createSSEStream(options = {}) {
         // Translate: targetFormat -> openai -> sourceFormat
         const translated = translateResponse(targetFormat, sourceFormat, parsed, state);
 
+        // Override model in ALL translated chunks to prevent upstream model
+        // name leakage. The translator's message_start handler sets
+        // state.model = chunk.message?.model (e.g. "minimax/MiniMax-M3")
+        // and creates the first SSE chunk *before* the state restore below.
+        // Without this post-process, the very first chunk would carry the
+        // upstream model name to Codex CLI, which reads it for its own
+        // delimiter format (`modelname[>`).
+        overrideModelInTranslations(translated, responseModel);
+        // Override model in intermediate logging chunks for clean debug logs
+        overrideModelInTranslations(translated?._openaiIntermediate, responseModel);
+
+        // Also restore state.model for subsequent translateResponse calls
+        if (responseModel && state?.model !== responseModel) {
+          state.model = responseModel;
+        }
+
         // Log OpenAI intermediate chunks (if available)
         if (translated?._openaiIntermediate) {
           for (const item of translated._openaiIntermediate) {
@@ -388,6 +429,12 @@ export function createSSEStream(options = {}) {
           if (parsed && !parsed.done) {
             const translated = translateResponse(targetFormat, sourceFormat, parsed, state);
 
+            // Override model in buffer-translated items (same logic as transform)
+            overrideModelInTranslations(translated, responseModel);
+
+            // Override model in intermediate logging chunks too
+            overrideModelInTranslations(translated?._openaiIntermediate, responseModel);
+
             if (translated?._openaiIntermediate) {
               for (const item of translated._openaiIntermediate) {
                 const openaiOutput = formatSSE(item, FORMATS.OPENAI);
@@ -405,8 +452,18 @@ export function createSSEStream(options = {}) {
             }
           }
         }
-
         const flushed = translateResponse(targetFormat, sourceFormat, null, state);
+
+        // Override model in flushed items
+        overrideModelInTranslations(flushed, responseModel);
+
+        // Override model in flushed intermediate logging chunks too
+        overrideModelInTranslations(flushed?._openaiIntermediate, responseModel);
+
+        // Restore response model after flush translation too
+        if (responseModel && state?.model !== responseModel) {
+          state.model = responseModel;
+        }
 
         if (flushed?._openaiIntermediate) {
           for (const item of flushed._openaiIntermediate) {
@@ -464,7 +521,37 @@ export function createSSEStream(options = {}) {
   });
 }
 
-export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, provider = null, reqLogger = null, toolNameMap = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null) {
+/**
+ * Override the model field in translated SSE items at all nesting levels.
+ * Handles:
+ *   - Top-level model (OpenAI Chat Completions)
+ *   - response.model (Responses API — response.created / response.in_progress)
+ *   - message.model (Claude Messages format)
+ *
+ * Must be called for every translateResponse() output: transform, flush buffer, flush final.
+ * Without this, upstream model names leak to Codex CLI, which reads the model
+ * field for its `modelname[>` delimiter.
+ */
+function overrideModelInTranslations(items, responseModel) {
+  if (!responseModel || !items?.length) return;
+  for (const item of items) {
+    if (!item) continue;
+    // Top-level model (OpenAI Chat Completions)
+    if (typeof item.model === "string" && item.model !== responseModel) {
+      item.model = responseModel;
+    }
+    // Nested response.model (Responses API)
+    if (item.response && typeof item.response.model === "string" && item.response.model !== responseModel) {
+      item.response.model = responseModel;
+    }
+    // Nested message.model (Claude Messages)
+    if (item.message && typeof item.message.model === "string" && item.message.model !== responseModel) {
+      item.message.model = responseModel;
+    }
+  }
+}
+
+export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, provider = null, reqLogger = null, toolNameMap = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null, toolNameMapExtra = null, responseModel = null) {
   return createSSEStream({
     mode: STREAM_MODE.TRANSLATE,
     targetFormat,
@@ -472,15 +559,16 @@ export function createSSETransformStreamWithLogger(targetFormat, sourceFormat, p
     provider,
     reqLogger,
     toolNameMap,
-    model,
+    model: responseModel || model,
     connectionId,
     body,
     onStreamComplete,
-    apiKey
+    apiKey,
+    responseModel  // Pass through for state.model restore after translation
   });
 }
 
-export function createPassthroughStreamWithLogger(provider = null, reqLogger = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null) {
+export function createPassthroughStreamWithLogger(provider = null, reqLogger = null, model = null, connectionId = null, body = null, onStreamComplete = null, apiKey = null, responseModel = null) {
   return createSSEStream({
     mode: STREAM_MODE.PASSTHROUGH,
     provider,
@@ -489,6 +577,7 @@ export function createPassthroughStreamWithLogger(provider = null, reqLogger = n
     connectionId,
     body,
     onStreamComplete,
-    apiKey
+    apiKey,
+    responseModel  // override model field in passthrough chunks too
   });
 }

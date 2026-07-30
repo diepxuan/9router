@@ -15,6 +15,8 @@ import { trackPendingRequest, appendRequestLog, saveRequestDetail } from "@/lib/
 import { getExecutor } from "../executors/index.js";
 import { supportsGrokCliReasoningEffort } from "../config/grokCli.js";
 import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDetail.js";
+// diepxuan: auto-discover rate-limit metadata from 429 responses (ADR-007 PR #60).
+import { maybeRecordLimitsFromUpstreamError } from "../diepxuan/limits/autoDiscoverHook.js";
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
 import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/streamingHandler.js";
@@ -363,18 +365,68 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // Provider returned error
   if (!providerResponse.ok) {
     trackPendingRequest(model, provider, connectionId, false, true);
-    const { statusCode, message, resetsAtMs } = await parseUpstreamError(providerResponse, executor);
+    // diepxuan: capture raw upstream body + structured error fields so root-cause
+    // analysis does not lose useful info (type/code/etc.) that `message` strips.
+    const {
+      statusCode,
+      message,
+      resetsAtMs,
+      body: upstreamBody,
+      errorBody: upstreamErrorBody,
+    } = await parseUpstreamError(providerResponse, executor);
+    // diepxuan: auto-record upstream rate-limit hints (ADR-007 PR #60). Pure
+    // no-op when fork flag off or when extractor cannot parse the body.
+    maybeRecordLimitsFromUpstreamError({
+      status: statusCode,
+      response: providerResponse,
+      body: upstreamBody ?? upstreamErrorBody,
+      connectionId,
+      provider,
+      model,
+    });
+    // diepxuan: surface conversation length so we can group "long-thread" vs
+    // "short-thread" failure modes in observability (see `2026-07-24` log).
+    const messageCount = Array.isArray(translatedBody?.messages)
+      ? translatedBody.messages.length
+      : Array.isArray(body?.messages)
+        ? body.messages.length
+        : Array.isArray(body?.input)
+          ? body.input.length
+          : 0;
+    const errorType =
+      upstreamErrorBody && typeof upstreamErrorBody === "object"
+        ? upstreamErrorBody.error?.type || upstreamErrorBody.type || undefined
+        : undefined;
+    const errorCode =
+      upstreamErrorBody && typeof upstreamErrorBody === "object"
+        ? upstreamErrorBody.error?.code ?? upstreamErrorBody.code ?? undefined
+        : undefined;
     appendRequestLog({ model, provider, connectionId, status: `FAILED ${statusCode}` }).catch(() => { });
-    saveRequestDetail(buildRequestDetail({
-      provider, model, connectionId,
-      latency: { ttft: 0, total: Date.now() - requestStartTime },
-      tokens: { prompt_tokens: 0, completion_tokens: 0 },
-      request: extractRequestConfig(body, stream),
-      providerRequest: finalBody || translatedBody || null,
-      response: { error: message, status: statusCode, thinking: null },
-      pxpipe: pxpipeSummary,
-      status: "error"
-    })).catch(() => { });
+    saveRequestDetail({
+      ...buildRequestDetail({
+        provider, model, connectionId,
+        latency: { ttft: 0, total: Date.now() - requestStartTime },
+        tokens: { prompt_tokens: 0, completion_tokens: 0 },
+        request: extractRequestConfig(body, stream),
+        providerRequest: finalBody || translatedBody || null,
+        response: {
+          error: message,
+          status: statusCode,
+          thinking: null,
+          errorType,
+          errorCode,
+          errorBody: upstreamErrorBody,
+          body: upstreamBody,
+        },
+        pxpipe: pxpipeSummary,
+        status: "error"
+      }),
+      // Top-level scalar for SQL aggregation:
+      //   SELECT COUNT(*) FROM requestDetails
+      //   WHERE json_extract(data, '$.messageCount') > 50
+      //        AND status = 'error' AND provider = 'minimax-cn';
+      messageCount,
+    }).catch(() => { });
 
     const errMsg = formatProviderError(new Error(message), provider, model, statusCode);
     if (log?.errorLine) {
