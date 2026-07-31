@@ -80,7 +80,10 @@ export function getCachedContextLength(modelId) {
 
 /**
  * Upsert context length for a model.
- * Higher-priority sources (error > api > static) always win on conflict.
+ * Source priority: api > static > error.
+ * Error-derived values only fill when no curated (api/static) value exists,
+ * because provider error text can reflect account/deployment limits rather
+ * than the model's actual context length.
  * @param {string} modelId
  * @param {number} contextLength
  * @param {"api"|"error"|"static"} source
@@ -97,10 +100,11 @@ export function upsertContextLength(modelId, contextLength, source) {
     ).get(modelId);
 
     if (existing) {
-      // Priority: error > api > static
-      const priority = { [SOURCE_ERROR]: 3, [SOURCE_API]: 2, [SOURCE_STATIC]: 1 };
-      if ((priority[source] || 0) <= (priority[existing.source] || 0)
-          && existing.context_length === contextLength) {
+      // Priority: api > static > error. A lower-priority source must never
+      // overwrite a higher-priority source (same source always refreshes).
+      const priority = { [SOURCE_API]: 3, [SOURCE_STATIC]: 2, [SOURCE_ERROR]: 1 };
+      if (source !== existing.source
+          && (priority[source] || 0) < (priority[existing.source] || 0)) {
         return;
       }
     }

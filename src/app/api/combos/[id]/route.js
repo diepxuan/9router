@@ -16,19 +16,18 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: "Combo not found" }, { status: 404 });
     }
     
+    // diepxuan: enrich with runtime context length
+    const ctxMap = getContextLengthBatchCached((combo.models || []));
+    combo.modelContexts = (combo.models || []).map(m => ({
+      id: m,
+      context_length: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
+    }));
     return NextResponse.json(combo);
   } catch (error) {
     console.log("Error fetching combo:", error);
     return NextResponse.json({ error: "Failed to fetch combo" }, { status: 500 });
   }
 }
-  // diepxuan: enrich with runtime context length
-  const ctxMap = getContextLengthBatchCached((combo.models || []));
-  combo.modelContexts = (combo.models || []).map(m => ({
-    id: m,
-    ctx: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
-  }));
-  combo.minContextLength = Math.min(...combo.modelContexts.filter(m => m.ctx).map(m => m.ctx)) || null;
 
 // PUT /api/combos/[id] - Update combo
 export async function PUT(request, { params }) {

@@ -1,7 +1,14 @@
 import PropTypes from "prop-types";
 import { CapacityBadges } from "@/shared/components";
 
-export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps, thinkingSuffix }) {
+function formatCtx(n) {
+  if (!Number.isFinite(n) || n <= 0) return "";
+  if (n >= 1048576) return `${(n / 1048576).toFixed(0)}M`;
+  if (n >= 1024) return `${Math.round(n / 1024)}K`;
+  return `${n}`;
+}
+
+export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps, contextLength, thinkingSuffix }) {
   const displayModel = thinkingSuffix ? `${fullModel}(${thinkingSuffix})` : fullModel;
   const borderColor = testStatus === "ok"
     ? "border-green-500/40"
@@ -29,6 +36,7 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
           <span className="flex min-w-0 items-center text-[9px] gap-1 pl-1">
             {model.name && <span className="truncate text-[9px] italic text-text-muted/70">{model.name}</span>}
             <CapacityBadges caps={caps} colorOverride="text-text-muted/70" size={12} />
+            {formatCtx(contextLength || caps?.contextWindow) ? <span className="truncate text-[9px] text-text-muted/70">{formatCtx(contextLength || caps?.contextWindow)}</span> : null}
           </span>
         </div>
         {onTest && (
@@ -98,5 +106,6 @@ ModelRow.propTypes = {
   isTesting: PropTypes.bool,
   onDisable: PropTypes.func,
   caps: PropTypes.object,
+  contextLength: PropTypes.number,
   thinkingSuffix: PropTypes.string,
 };

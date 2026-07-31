@@ -63,6 +63,7 @@ export default function ProviderDetailPage() {
   const [bulkProxyPoolId, setBulkProxyPoolId] = useState("__none__");
   const [bulkUpdatingProxy, setBulkUpdatingProxy] = useState(false);
   const [providerStrategy, setProviderStrategy] = useState(null);
+  const [modelContextLengths, setModelContextLengths] = useState({});
   const [providerStickyLimit, setProviderStickyLimit] = useState("");
   const [thinkingMode, setThinkingMode] = useState("auto");
   const [autoPing, setAutoPing] = useState({ enabled: false, connections: {} });
@@ -148,7 +149,20 @@ export default function ProviderDetailPage() {
     ? liveModels
     : staticModels;
   const providerAlias = getProviderAlias(providerId);
-  
+  const modelIdsKey = (models || []).map((m) => m?.id).filter(Boolean).join(",");
+  useEffect(() => {
+    const ids = (models || [])
+      .filter((m) => m?.id)
+      .map((m) => `${providerId}/${m.id}`);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/models/context-lengths?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { contextLengths: {} }))
+      .then((data) => { if (!cancelled) setModelContextLengths(data.contextLengths || {}); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [providerId, modelIdsKey]);
+
   const isOpenAICompatible = isOpenAICompatibleProvider(providerId);
   const isAnthropicCompatible = isAnthropicCompatibleProvider(providerId);
   const isCompatible = isOpenAICompatible || isAnthropicCompatible;
@@ -1130,6 +1144,7 @@ export default function ProviderDetailPage() {
             isCustom
             isFree={false}
             caps={getCaps(`${providerId}/${model.id}`)}
+            contextLength={modelContextLengths[`${providerId}/${model.id}`]}
             thinkingSuffix={resolveThinkingSuffix(model.id)}
           />
         ))}
@@ -1156,6 +1171,7 @@ export default function ProviderDetailPage() {
               isFree={model.isFree}
               onDisable={() => handleDisableModel(model.id)}
               caps={getCaps(`${providerId}/${model.id}`)}
+              contextLength={modelContextLengths[`${providerId}/${model.id}`]}
               thinkingSuffix={resolveThinkingSuffix(model.id)}
             />
           );

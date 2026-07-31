@@ -257,10 +257,10 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
               ) : (
                 combo.models.slice(0, 3).map((model, index) => {
                   const mc = (combo.modelContexts || []).find(m => m.id === model);
-                  const ctxStr = mc?.ctx
-                    ? mc.ctx >= 1048576 ? `\${(mc.ctx / 1048576).toFixed(0)}M`
-                    : mc.ctx >= 1024 ? `\${Math.round(mc.ctx / 1024)}K`
-                    : String(mc.ctx)
+                  const ctxStr = mc?.context_length
+                    ? mc.context_length >= 1048576 ? `${(mc.context_length / 1048576).toFixed(0)}M`
+                    : mc.context_length >= 1024 ? `${Math.round(mc.context_length / 1024)}K`
+                    : String(mc.context_length)
                     : null;
                   return (
                   <code key={index} className="inline-flex items-center gap-1 rounded bg-black/5 px-1.5 py-0.5 font-mono text-xs text-text-muted dark:bg-white/5">

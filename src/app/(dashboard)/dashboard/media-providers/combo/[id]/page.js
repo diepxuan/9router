@@ -266,7 +266,6 @@ function formatCtx(n) {
           <div className="min-w-0">
             <p className="text-xs text-text-muted">{kindLabel} Combo</p>
             <code className="text-lg font-semibold font-mono">{combo.name}</code>
-            {combo.minContextLength ? <span className="inline-flex items-center gap-1 rounded bg-black/[0.04] dark:bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-text-muted font-mono mt-0.5">{formatCtx(combo.minContextLength)} min</span> : null}
           </div>
         </div>
         <Button variant="outline" icon="delete" onClick={handleDelete} className="text-red-500 border-red-200 hover:bg-red-50">
@@ -306,12 +305,7 @@ function formatCtx(n) {
             No providers yet.
           </div>
         ) : (
-                  {(() => {
-                    const ctxMap = new Map((combo?.modelContexts || []).map(mc => [mc.id, mc.ctx]));
-                    const ctx = ctxMap.get(entry);
-                    return ctx ? <span className="text-[10px] text-text-muted ml-1 shrink-0">({formatCtx(ctx)})</span> : null;
-                  })()}
-          <div className="flex flex-col gap-2">
+<div className="flex flex-col gap-2">
             {providers.map((entry, idx) => {
               const { providerId, model } = parseModelEntry(entry);
               const p = AI_PROVIDERS[providerId];
@@ -329,6 +323,11 @@ function formatCtx(n) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{p?.name || providerId}</div>
                     {model && <code className="text-[10px] text-text-muted font-mono truncate block">{model}</code>}
+                    {(() => {
+                      const mc = (combo?.modelContexts || []).find(m => m.id === entry);
+                      const ctx = mc?.context_length;
+                      return ctx ? <span className="text-[10px] text-text-muted ml-1 shrink-0">({formatCtx(ctx)})</span> : null;
+                    })()}
                   </div>
                   <div className="flex items-center gap-0.5">
                     <button onClick={() => handleMove(idx, -1)} disabled={idx === 0} className={`p-1 rounded ${idx === 0 ? "text-text-muted/20" : "text-text-muted hover:text-primary hover:bg-black/5"}`} title="Move up">

@@ -14,13 +14,13 @@ const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
     const ctxMap = getContextLengthBatchCached(models);
     return models.map(m => ({
       id: m,
-      ctx: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
+      context_length: ctxMap.get(m)?.contextLength || getStaticContextLength(m) || null,
     }));
   }
 export async function GET() {
   try {
     const combos = await getCombos();
-    return NextResponse.json({ combos });
+    return NextResponse.json({ combos: combos.map(c => ({ ...c, modelContexts: enrichModels(c.models) })) });
   } catch (error) {
     console.log("Error fetching combos:", error);
     return NextResponse.json({ error: "Failed to fetch combos" }, { status: 500 });
