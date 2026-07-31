@@ -105,6 +105,7 @@ Conflicts=${PROD_SERVICE_NAME}.service
 [Service]
 Type=simple
 WorkingDirectory=$(pwd)
+Environment=NODE_ENV=development
 ExecStart=/usr/bin/npm run dev -- --port 3000
 Restart=always
 RestartSec=5
