@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
-import { getComboById, updateCombo, deleteCombo, getComboByName } from "@/lib/localDb";
+import { getComboById, updateCombo, deleteCombo, getComboByName, renameComboReferences } from "@/lib/localDb";
 import { resetComboRotation } from "open-sse/services/combo.js";
 
 // Validate combo name: only a-z, A-Z, 0-9, -, _
@@ -58,7 +58,11 @@ export async function PUT(request, { params }) {
 
     // Invalidate rotation state (models/strategy/name may have changed)
     if (prev?.name) resetComboRotation(prev.name);
-    if (combo.name && combo.name !== prev?.name) resetComboRotation(combo.name);
+    if (combo.name && combo.name !== prev?.name) {
+      resetComboRotation(combo.name);
+      // Rename nested references in other combos that use this combo as a model.
+      await renameComboReferences(prev.name, combo.name);
+    }
 
     return NextResponse.json(combo);
   } catch (error) {

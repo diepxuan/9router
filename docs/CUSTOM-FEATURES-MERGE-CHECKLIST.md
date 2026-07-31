@@ -1,0 +1,111 @@
+# Custom Features Merge Checklist
+
+> Fork `diepxuan/9router` changelog duy nhất (thay cho `CHANGELOG.md`).
+> Mục tiêu: biết fork custom gì, file nào cần giữ khi rebase upstream.
+
+## Quy tắc
+
+- Không sửa base file upstream trực tiếp; custom nằm trong fork layer (`src/diepxuan/`, `open-sse/diepxuan/`).
+- Sau rebase upstream: chạy `node scripts/diepxuan/check-custom-features.mjs`, PASS rồi mới push.
+- Manifest máy đọc: `docs/custom-features.manifest.json`.
+
+## Features đã xóa (2026-07-21)
+
+- Alibaba Cloud Coding Plan (alicode, alicode-intl)
+- Manual quota counter
+- Enhanced quota dashboard (ProviderLimits custom)
+
+## Nhóm custom features
+
+### 1. Provider registry & capabilities
+
+Các provider custom trong fork layer, base registry không sửa.
+
+| Feature | File chính |
+|---|---|
+| AIHubMix / TokenRouter / ZenMux | `open-sse/diepxuan/registry/aihubmix.js`, `tokenrouter.js`, `zenmux.js` |
+| Agnes | `open-sse/diepxuan/registry/agnes.js`, `open-sse/handlers/imageProviders/index.js` |
+| Groq expansion + capabilities | `open-sse/diepxuan/registry/groq.js`, `open-sse/providers/capabilities.js` |
+| Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
+| NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
+| MiniMax stripBuiltinTools config | `open-sse/diepxuan/registry/minimax.js`, `minimax-cn.js` |
+| Wire vào registry | `open-sse/providers/registry/index.js` |
+
+### 2. Context length system
+
+| Feature | File chính |
+|---|---|
+| Cache + API + error parser | `open-sse/diepxuan/contextLength/` |
+| `/v1/models` enrichment | `src/app/api/v1/models/route.js` |
+| Context lengths API | `src/app/api/models/context-lengths/route.js` |
+| Combo ctx skip | `open-sse/diepxuan/comboHooks.js` (`estimateTokens` + `getContextLengthSync`) |
+| UI ctx badges (combo + provider) | `combos/page.js`, `combo/[id]/page.js`, `providers/[id]/ModelRow.js` |
+| Source priority api > static > error | `contextLength/cache.js` |
+
+### 3. Rate-limit engine (ADR-007)
+
+| Feature | File chính |
+|---|---|
+| Metadata resolution | `open-sse/diepxuan/limits/index.js` |
+| Auto-discovery từ 429 | `limits/autoDiscovery.js`, `autoDiscoverHook.js`, `errorParser.js` |
+| Throttle sliding window | `limits/throttle.js`, `cache.js`, `window.js` |
+| Combo fail tracker + skip | `open-sse/diepxuan/comboHooks.js`, `comboFailTracker.js`, `services/combo.js` |
+| Wire vào core | `handlers/chatCore.js`, `utils/error.js`, `services/accountFallback.js` |
+
+### 4. Fork transformers & executors
+
+| Feature | File chính |
+|---|---|
+| NVIDIA clean tool ids | `open-sse/diepxuan/nvidia/cleanToolIds.js`, `translator/index.js` |
+| NVIDIA strip text / inject max_tokens | `open-sse/diepxuan/translator/paramSupportHooks.js`, `executors/default.js` |
+| Codex builtin tool pruner (config-driven) | `transformers/stripBuiltinTools.js`, `registry/minimax.js`, `minimax-cn.js` |
+| Groq incompatible strip | `transformers/stripGroqIncompatible.js`, `executors/groq.js` |
+| MiMo free 441 cooldown | `executors/mimo-free.js`, `executors/index.js` |
+| Combo response model override | `transformers/responseModelOverride.js`, `chatCore.js`, `utils/stream.js` |
+
+### 5. UI / Dashboard
+
+| Feature | File chính |
+|---|---|
+| Enhanced Console Log | `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx`, `console-log/page.js` |
+| CLI tools current-origin endpoint | `src/diepxuan/app/dashboard/cli-tools/baseUrl.js` + tool cards |
+| Codex subagent description | `cli-tools/codex.js`, `CodexToolCard.js`, `codex-settings/route.js` |
+| Combo curl dynamic baseUrl | `combo/[id]/page.js` |
+| DonateModal removal | `src/shared/components/Header.js` |
+| i18n vi combos | `public/i18n/literals/vi.json` |
+| Combo list A-Z | `src/app/(dashboard)/dashboard/combos/page.js` |
+
+### 6. Infrastructure
+
+| Feature | File chính |
+|---|---|
+| Shared DB singleton | `open-sse/diepxuan/db/sharedDb.js` (`global._dbAdapter.instance.raw`) |
+| Feature flag | `src/diepxuan/shared/config/flags.js` (`isDiepXuanEnabled`) |
+| Debug log theo service | `open-sse/utils/debugLog.js` (`DIEPXUAN_DEBUG_LOG`) |
+| dev.sh + NODE_ENV | `dev.sh` |
+| next.config allowedDevOrigins | `next.config.mjs` |
+| CI/CD pipeline | `.github/workflows/build-and-deploy.yml` |
+| Governance files | `SOUL.md`, `IDENTITY.md`, `USER.md`, `TOOLS.md`, `AGENTS.md`, `AGENT_WORKSPACE.md`, `BOOTSTRAP.md`, `HEARTBEAT.md` |
+
+## Kiểm tra sau rebase
+
+```bash
+node scripts/diepxuan/check-custom-features.mjs
+npm run build
+```
+
+Cả hai PASS mới push.
+
+## Smoke test nhanh
+
+- Proxy: `curl http://localhost:3000/api/health`
+- Combo: mở `/dashboard/combos`, kiểm tra ctx badge + fallback
+- Rate limit: gửi request vượt RPM, kiểm tra throttle/fallback
+- Console log: mở `/dashboard/console-log`
+- `/v1/models`: kiểm tra `context_length` có giá trị
+
+## Ghi chú merge/rebase
+
+- PR chỉ tạo trên `diepxuan/9router`, không lên upstream `decolua/9router`.
+- Không push trực tiếp main/master.
+- Nếu sửa base file, ghi rõ lý do ở commit.

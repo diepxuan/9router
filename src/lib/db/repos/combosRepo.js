@@ -66,6 +66,42 @@ export async function updateCombo(id, data) {
   return result;
 }
 
+/**
+ * Rename references to an old combo name inside other combos' models.
+ * Used when a combo is renamed so nested combo references follow the new name.
+ * @param {string} oldName
+ * @param {string} newName
+ */
+export async function renameComboReferences(oldName, newName) {
+  if (!oldName || !newName || oldName === newName) return 0;
+  const db = await getAdapter();
+  let updated = 0;
+  db.transaction(() => {
+    const combos = db.all(`SELECT id, name, models FROM combos`).map(rowToCombo);
+    for (const combo of combos) {
+      if (combo.name === oldName || !Array.isArray(combo.models)) continue;
+      const next = [];
+      let changed = false;
+      for (const m of combo.models) {
+        if (m === oldName) {
+          if (!next.includes(newName)) next.push(newName);
+          changed = true;
+        } else {
+          next.push(m);
+        }
+      }
+      if (changed) {
+        db.run(
+          `UPDATE combos SET models = ?, updatedAt = ? WHERE id = ?`,
+          [stringifyJson(next), new Date().toISOString(), combo.id]
+        );
+        updated++;
+      }
+    }
+  });
+  return updated;
+}
+
 export async function deleteCombo(id) {
   const db = await getAdapter();
   const res = db.run(`DELETE FROM combos WHERE id = ?`, [id]);

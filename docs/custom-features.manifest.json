@@ -1,0 +1,983 @@
+{
+  "schemaVersion": 1,
+  "description": "Machine-readable guardrails for DiepXuan fork custom features that must survive upstream master rebases.",
+  "rebaseBaseline": {
+    "fork": "diepxuan/9router",
+    "upstream": "decolua/9router",
+    "forkBranch": "main",
+    "upstreamBranch": "master",
+    "checkCommand": "node scripts/diepxuan/check-custom-features.mjs",
+    "note": "Schema 1. 10 grouped features as of 2026-07-31."
+  },
+  "features": [
+    {
+      "id": "rate-limit-engine",
+      "description": "Rate-limit engine (ADR-007): metadata resolution, auto-discovery từ 429, throttle sliding window, combo fail tracker + skip, wire vào core proxy.",
+      "requiredFiles": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js",
+        "src/app/api/settings/route.js",
+        "tests/unit/combo-immediate-fallback-node.test.mjs",
+        "open-sse/diepxuan/limits/autoDiscoverHook.js",
+        "open-sse/diepxuan/limits/autoDiscovery.js",
+        "open-sse/handlers/chatCore.js",
+        "tests/unit/limits-auto-discovery.test.mjs",
+        "open-sse/diepxuan/limits/index.js",
+        "open-sse/diepxuan/limits/errorParser.js",
+        "open-sse/diepxuan/limits/inference.js",
+        "open-sse/diepxuan/limits/README.md",
+        "tests/unit/limits-resolution.test.mjs",
+        "open-sse/diepxuan/limits/cache.js",
+        "open-sse/diepxuan/limits/window.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "src/sse/handlers/chat.js",
+        "tests/unit/limits-throttle.test.mjs",
+        "open-sse/services/accountFallback.js",
+        "open-sse/utils/error.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "afterComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "shouldSkipComboModel"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "recordComboModelOutcome"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "afterComboModelAttempt"
+        },
+        {
+          "file": "open-sse/diepxuan/comboFailTracker.js",
+          "pattern": "MAX_FAILS"
+        },
+        {
+          "file": "src/app/api/settings/route.js",
+          "pattern": "resetComboFailTracker"
+        },
+        {
+          "file": "tests/unit/combo-immediate-fallback-node.test.mjs",
+          "pattern": "combo fallback immediately tries next model"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
+          "pattern": "maybeRecordLimitsFromUpstreamError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
+          "pattern": "extractLimitsFromError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "initAutoDiscoveredLimitsTable"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "CREATE TABLE IF NOT EXISTS"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "maybeRecordLimitsFromUpstreamError"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "diepxuan/limits/autoDiscoverHook"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getResolvedLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "mergeLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getProviderLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getModelLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
+          "pattern": "getAutoDiscoveredLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/errorParser.js",
+          "pattern": "extractLimitsFromError"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/inference.js",
+          "pattern": "inferLimitsFromContext"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "initRateLimitCountersTable"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "readPrunedEvents"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/cache.js",
+          "pattern": "pushEvent"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/window.js",
+          "pattern": "oldestAgeOutAt"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/window.js",
+          "pattern": "projectedAgeOutAt"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "acquireQuotaSlot"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "recordRequestOutcome"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "estimateTokens"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "acquireQuotaSlot"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "async function beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "await beforeComboModelAttempt"
+        },
+        {
+          "file": "open-sse/services/combo.js",
+          "pattern": "wrapped"
+        },
+        {
+          "file": "src/sse/handlers/chat.js",
+          "pattern": "connectionId: credentials.connectionId"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/services/combo.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/comboFailTracker.js",
+        "src/app/api/settings/route.js",
+        "tests/unit/combo-immediate-fallback-node.test.mjs",
+        "open-sse/diepxuan/limits/autoDiscoverHook.js",
+        "open-sse/handlers/chatCore.js",
+        "tests/unit/limits-auto-discovery.test.mjs",
+        "open-sse/diepxuan/limits/index.js",
+        "open-sse/diepxuan/limits/autoDiscovery.js",
+        "open-sse/diepxuan/limits/errorParser.js",
+        "open-sse/diepxuan/limits/inference.js",
+        "tests/unit/limits-resolution.test.mjs",
+        "open-sse/diepxuan/limits/cache.js",
+        "open-sse/diepxuan/limits/window.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "src/sse/handlers/chat.js",
+        "tests/unit/limits-throttle.test.mjs",
+        "open-sse/services/accountFallback.js",
+        "open-sse/utils/error.js"
+      ]
+    },
+    {
+      "id": "ui-dashboard",
+      "description": "UI/Dashboard: Enhanced Console Log, CLI tools current-origin, Codex subagent, combo curl baseUrl, DonateModal removal, i18n vi, combo list A-Z.",
+      "requiredFiles": [
+        "src/app/(dashboard)/dashboard/console-log/page.js",
+        "src/diepxuan/app/dashboard/console-log/index.js",
+        "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "next.config.mjs",
+        "src/shared/components/Header.js",
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js",
+        "src/diepxuan/app/dashboard/cli-tools/codex.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+        "src/app/api/cli-tools/codex-settings/route.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/(dashboard)/dashboard/console-log/page.js",
+          "pattern": "@/diepxuan/app/dashboard/console-log"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/console-log/page.js",
+          "pattern": "<EnhancedConsoleLog\\s*/>"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/index.js",
+          "pattern": "EnhancedConsoleLog"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+          "pattern": "function EnhancedConsoleLog|export default function EnhancedConsoleLog"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+          "pattern": "baseUrl|window\\.location|headers"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getCurrentBrowserOrigin"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+          "pattern": "getToolDetailBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+          "pattern": "getToolDetailBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+          "pattern": "getCurrentBrowserOrigin"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js",
+          "pattern": "getCliToolBaseUrl"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/codex.js",
+          "pattern": "CODEX_SUBAGENT_DESCRIPTION"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/cli-tools/codex.js",
+          "pattern": "extendCodexSubagentConfig"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+          "pattern": "CODEX_SUBAGENT_DESCRIPTION"
+        },
+        {
+          "file": "src/app/api/cli-tools/codex-settings/route.js",
+          "pattern": "extendCodexSubagentConfig"
+        }
+      ],
+      "syntaxCheck": [
+        "src/app/(dashboard)/dashboard/console-log/page.js",
+        "src/diepxuan/app/dashboard/console-log/index.js",
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "next.config.mjs",
+        "src/shared/components/Header.js",
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/BaseUrlSelect.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js",
+        "src/diepxuan/app/dashboard/cli-tools/codex.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
+        "src/app/api/cli-tools/codex-settings/route.js"
+      ]
+    },
+    {
+      "id": "web-tool-combo-fallback",
+      "description": "Web search/fetch combo fallback khi không có provider input.",
+      "requiredFiles": [
+        "src/sse/handlers/search.js",
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "getCombos"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "No provider/model specified"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "Unknown provider"
+        },
+        {
+          "file": "src/sse/handlers/search.js",
+          "pattern": "handleComboChat"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "getCombos"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "No provider/model specified"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "Unknown provider"
+        },
+        {
+          "file": "src/sse/handlers/fetch.js",
+          "pattern": "handleComboChat"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "getFirstWebCombo"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "getFallbackWebCombo"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "handleDiepXuanWebComboFallback"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "firstCombo"
+        }
+      ],
+      "syntaxCheck": [
+        "src/sse/handlers/search.js",
+        "src/sse/handlers/fetch.js",
+        "src/diepxuan/sse/webComboFallback.js"
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "description": "Infrastructure: shared DB singleton, feature flag, debug log theo service, dev.sh, next.config, CI/CD, governance files, CLI package.",
+      "requiredFiles": [
+        "cli/package.json",
+        "cli/cli.js",
+        "cli/hooks/postinstall.js",
+        ".npmignore",
+        "next.config.mjs",
+        ".github/workflows/build-and-deploy.yml",
+        "Dockerfile",
+        "captain-definition",
+        "scripts/sync.sh",
+        "AGENTS.md",
+        "AGENT_WORKSPACE.md",
+        "BOOTSTRAP.md",
+        "SOUL.md",
+        "IDENTITY.md",
+        "TOOLS.md",
+        "USER.md",
+        "HEARTBEAT.md",
+        "docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md",
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js",
+        "dev.sh"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "cli/package.json",
+          "pattern": "9router"
+        },
+        {
+          "file": "cli/cli.js",
+          "pattern": "9Router|9router"
+        },
+        {
+          "file": "cli/hooks/postinstall.js",
+          "pattern": "postinstall|install"
+        },
+        {
+          "file": ".npmignore",
+          "pattern": "next\\.config\\.mjs"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "branches: \\[main\\]"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "contents: write"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "packages: write"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "registry-url: \\\"https://npm\\.pkg\\.github\\.com\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm install"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg set name=\\\"@diepxuan/9router\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg set publishConfig\\.registry=\\\"https://npm\\.pkg\\.github\\.com/\\\""
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm pkg delete scripts\\.prepublishOnly"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm run build"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm version patch --no-git-tag-version"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm version prerelease --preid=patch"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "npm publish"
+        },
+        {
+          "file": ".github/workflows/build-and-deploy.yml",
+          "pattern": "NODE_AUTH_TOKEN: \\${\\{ secrets\\.GITHUB_TOKEN \\}\\}"
+        },
+        {
+          "file": "scripts/sync.sh",
+          "pattern": "rsync -avP --delete 9router:~/.9router/ /var/lib/9router/"
+        },
+        {
+          "file": "AGENTS.md",
+          "pattern": "Boot Sequence|Git"
+        },
+        {
+          "file": "SOUL.md",
+          "pattern": "9Router Agent"
+        },
+        {
+          "file": "IDENTITY.md",
+          "pattern": "diepxuan/9router"
+        },
+        {
+          "file": "docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md",
+          "pattern": "Custom Features Merge Checklist"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "DIEPXUAN_ENABLED"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "src/diepxuan/shared/config/flags.js",
+          "pattern": "parseBool\\(process\\.env\\.DIEPXUAN_ENABLED, true\\)"
+        },
+        {
+          "file": "src/diepxuan/sse/webComboFallback.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "isDiepXuanEnabled"
+        },
+        {
+          "file": "tests/unit/diepxuan-feature-flags.test.js",
+          "pattern": "enables DiepXuan hooks by default"
+        },
+        {
+          "file": "tests/unit/diepxuan-feature-flags.test.js",
+          "pattern": "skips a combo model after repeated failures"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "9router\\.diepxuan\\.corp"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "9router-dev"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "HOSTS_MARKER"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "get_vm_ip"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "stop_prod_service"
+        },
+        {
+          "file": "dev.sh",
+          "pattern": "start_prod_service"
+        }
+      ],
+      "syntaxCheck": [
+        "cli/cli.js",
+        "cli/hooks/postinstall.js",
+        "cli/src/cli/api/client.js",
+        "cli/src/cli/menus/providers.js",
+        "cli/src/cli/menus/settings.js",
+        "cli/src/cli/terminalUI.js",
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "tests/unit/diepxuan-feature-flags.test.js"
+      ]
+    },
+    {
+      "id": "antigravity-mitm-flow",
+      "description": "MITM / Antigravity custom flow.",
+      "requiredFiles": [
+        "src/app/api/cli-tools/antigravity-mitm/route.js",
+        "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+        "src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js",
+        "src/mitm/manager.js",
+        "src/mitm/handlers/base.js",
+        "src/mitm/handlers/antigravity.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/api/cli-tools/antigravity-mitm/route.js",
+          "pattern": "antigravity|MITM|mitm"
+        },
+        {
+          "file": "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+          "pattern": "alias|antigravity|mitm"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js",
+          "pattern": "MITM|mitm|Antigravity"
+        },
+        {
+          "file": "src/mitm/manager.js",
+          "pattern": "MITM|mitm"
+        }
+      ],
+      "syntaxCheck": [
+        "src/app/api/cli-tools/antigravity-mitm/route.js",
+        "src/app/api/cli-tools/antigravity-mitm/alias/route.js",
+        "src/mitm/manager.js",
+        "src/mitm/handlers/base.js",
+        "src/mitm/handlers/antigravity.js"
+      ]
+    },
+    {
+      "id": "context-length-system",
+      "description": "Context length: cache/API/error parser, /v1/models + /api/models/context-lengths enrichment, combo ctx skip, UI ctx badges, source priority api > static > error.",
+      "requiredFiles": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js",
+        "open-sse/services/accountFallback.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "src/app/api/models/context-lengths/route.js",
+        "src/app/(dashboard)/dashboard/combos/page.js",
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/page.js",
+        "src/app/api/combos/[id]/route.js",
+        "src/app/api/combos/route.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "getStaticContextLength"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "context_length"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "LIVE_MODEL_RESOLVERS"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/modelsApi.js",
+          "pattern": "resolveProviderModelsWithContext"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/cache.js",
+          "pattern": "contextLength"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/errorParser.js",
+          "pattern": "extractContextLengthFromError"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "estimateTokens"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "context_too_large"
+        },
+        {
+          "file": "open-sse/diepxuan/comboHooks.js",
+          "pattern": "getContextLengthSync"
+        },
+        {
+          "file": "src/app/api/models/context-lengths/route.js",
+          "pattern": "contextLengths"
+        },
+        {
+          "file": "src/app/api/models/context-lengths/route.js",
+          "pattern": "getContextLengthBatchCached"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/combos/page.js",
+          "pattern": "context_length"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+          "pattern": "formatCtx"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/contextLength/index.js",
+        "open-sse/diepxuan/contextLength/cache.js",
+        "open-sse/diepxuan/contextLength/modelsApi.js",
+        "open-sse/diepxuan/contextLength/errorParser.js",
+        "src/app/api/v1/models/route.js",
+        "open-sse/diepxuan/comboHooks.js",
+        "open-sse/diepxuan/limits/throttle.js",
+        "src/app/api/models/context-lengths/route.js",
+        "src/app/(dashboard)/dashboard/combos/page.js",
+        "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/page.js",
+        "src/app/api/combos/route.js",
+        "src/app/api/combos/[id]/route.js"
+      ]
+    },
+    {
+      "id": "fork-transformers-executors",
+      "description": "Fork transformers & executors: cleanToolIds, stripBuiltinTools (config-driven), stripGroqIncompatible, paramSupportHooks, mimo-free 441, error observability.",
+      "requiredFiles": [
+        "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/translator/index.js",
+        "open-sse/diepxuan/executors/mimo-free.js",
+        "open-sse/executors/index.js",
+        "open-sse/utils/error.js",
+        "open-sse/handlers/chatCore.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+          "pattern": "stripBuiltinTools\\(body, model, config\\)"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+          "pattern": "config\\.namelessTypes"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/minimax.js",
+          "pattern": "stripBuiltinTools"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/minimax-cn.js",
+          "pattern": "stripBuiltinTools"
+        },
+        {
+          "file": "open-sse/translator/index.js",
+          "pattern": "stripBuiltinTools"
+        },
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "DiepxuanMimoFreeExecutor"
+        },
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "parseMimoFreeError"
+        },
+        {
+          "file": "open-sse/diepxuan/executors/mimo-free.js",
+          "pattern": "MIMO_RATE_LIMIT_CODES"
+        },
+        {
+          "file": "open-sse/executors/index.js",
+          "pattern": "DiepxuanMimoFreeExecutor"
+        },
+        {
+          "file": "open-sse/executors/index.js",
+          "pattern": "isDiepXuanEnabled\\(\\) \\? DiepxuanMimoFreeExecutor : MimoFreeExecutor"
+        },
+        {
+          "file": "open-sse/utils/error.js",
+          "pattern": "errorBody:"
+        },
+        {
+          "file": "open-sse/utils/error.js",
+          "pattern": "body: bodyText \\|\\| undefined"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "upstreamErrorBody"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "messageCount"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/transformers/stripBuiltinTools.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/translator/index.js",
+        "open-sse/diepxuan/executors/mimo-free.js",
+        "open-sse/executors/index.js",
+        "open-sse/utils/error.js",
+        "open-sse/handlers/chatCore.js"
+      ]
+    },
+    {
+      "id": "combo-response-model-override",
+      "description": "Combo response model override chống leak internal model name cho Codex CLI.",
+      "requiredFiles": [
+        "open-sse/diepxuan/transformers/responseModelOverride.js",
+        "open-sse/handlers/chatCore.js",
+        "open-sse/utils/stream.js",
+        "tests/unit/responseModelOverride.test.js",
+        "tests/unit/passthroughModelOverride.test.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "captureOriginalRequestedModel"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "wrapNonStreamingResponseWithModelOverride"
+        },
+        {
+          "file": "open-sse/handlers/chatCore.js",
+          "pattern": "wrapResponseBodyWithModelOverride"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "captureOriginalRequestedModel"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "wrapResponseBodyWithModelOverride"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/responseModelOverride.js",
+          "pattern": "overrideModelInSseText"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/handlers/chatCore.js",
+        "open-sse/diepxuan/transformers/responseModelOverride.js"
+      ]
+    },
+    {
+      "id": "provider-registry-expansion",
+      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, MiniMax strip config.",
+      "requiredFiles": [
+        "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/providers/registry/index.js",
+        "open-sse/diepxuan/registry/agnes.js",
+        "open-sse/diepxuan/registry/aihubmix.js",
+        "open-sse/diepxuan/registry/tokenrouter.js",
+        "open-sse/diepxuan/registry/zenmux.js",
+        "open-sse/diepxuan/registry/groq.js",
+        "open-sse/diepxuan/registry/qoder.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/providers/capabilities.js",
+        "open-sse/handlers/imageProviders/index.js",
+        "src/app/api/providers/[id]/test/testUtils.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "ADDITIONAL_MODELS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "openai/gpt-oss-20b"
+        },
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry/nvidia.js"
+        },
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/aihubmix.js",
+          "pattern": "aihubmix"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/groq.js",
+          "pattern": "baseGroq"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/providers/registry/index.js",
+        "open-sse/diepxuan/registry/agnes.js",
+        "open-sse/diepxuan/registry/aihubmix.js",
+        "open-sse/diepxuan/registry/tokenrouter.js",
+        "open-sse/diepxuan/registry/zenmux.js",
+        "open-sse/diepxuan/registry/groq.js",
+        "open-sse/diepxuan/registry/qoder.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/providers/capabilities.js",
+        "open-sse/handlers/imageProviders/index.js",
+        "src/app/api/providers/[id]/test/testUtils.js"
+      ]
+    },
+    {
+      "id": "fork-layer-integrity",
+      "description": "fork-layer-integrity",
+      "requiredFiles": [
+        "open-sse/diepxuan/db/sharedDb.js",
+        "open-sse/diepxuan/executors/default.js",
+        "open-sse/diepxuan/executors/groq.js",
+        "open-sse/diepxuan/nvidia/cleanToolIds.js",
+        "open-sse/diepxuan/registry/agnes.js",
+        "open-sse/diepxuan/registry/aihubmix.js",
+        "open-sse/diepxuan/registry/groq.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/qoder.js",
+        "open-sse/diepxuan/registry/tokenrouter.js",
+        "open-sse/diepxuan/registry/zenmux.js",
+        "open-sse/diepxuan/transformers/stripGroqIncompatible.js",
+        "open-sse/diepxuan/translator/paramSupportHooks.js",
+        "open-sse/handlers/chatCore/nonStreamingHandler.js",
+        "open-sse/handlers/chatCore/streamingHandler.js",
+        "open-sse/handlers/imageProviders/index.js",
+        "open-sse/providers/capabilities.js",
+        "open-sse/providers/registry/index.js",
+        "src/app/api/models/context-lengths/route.js",
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+        "public/providers/agnes.png",
+        "src/app/api/providers/[id]/test/testUtils.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry"
+        },
+        {
+          "file": "open-sse/diepxuan/db/sharedDb.js",
+          "pattern": "_dbAdapter"
+        },
+        {
+          "file": "open-sse/diepxuan/translator/paramSupportHooks.js",
+          "pattern": "applyForkParamRules"
+        }
+      ],
+      "syntaxCheck": [
+        "open-sse/diepxuan/db/sharedDb.js",
+        "open-sse/diepxuan/executors/default.js",
+        "open-sse/diepxuan/executors/groq.js",
+        "open-sse/diepxuan/nvidia/cleanToolIds.js",
+        "open-sse/diepxuan/registry/agnes.js",
+        "open-sse/diepxuan/registry/aihubmix.js",
+        "open-sse/diepxuan/registry/groq.js",
+        "open-sse/diepxuan/registry/minimax-cn.js",
+        "open-sse/diepxuan/registry/minimax.js",
+        "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/qoder.js",
+        "open-sse/diepxuan/registry/tokenrouter.js",
+        "open-sse/diepxuan/registry/zenmux.js",
+        "open-sse/diepxuan/transformers/stripGroqIncompatible.js",
+        "open-sse/diepxuan/translator/paramSupportHooks.js",
+        "open-sse/handlers/chatCore/nonStreamingHandler.js",
+        "open-sse/handlers/chatCore/streamingHandler.js",
+        "open-sse/handlers/imageProviders/index.js",
+        "open-sse/providers/capabilities.js",
+        "open-sse/providers/registry/index.js",
+        "src/app/api/models/context-lengths/route.js",
+        "src/diepxuan/app/dashboard/cli-tools/baseUrl.js",
+        "src/diepxuan/shared/config/flags.js",
+        "src/diepxuan/sse/webComboFallback.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js"
+      ]
+    }
+  ],
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 21 features (added limit-throttle-engine #61) (limit-metadata-resolution #59 + limit-auto-discovery #60)."
+}

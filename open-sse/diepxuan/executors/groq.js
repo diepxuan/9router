@@ -34,6 +34,7 @@ const GROQ_BLOCKED_BODY_FIELDS = [
   "store",          // not supported with any Groq model
   "logit_bias",     // not supported with reasoning models (qwen3.6-27b, etc)
   "n",              // Groq only allows n=1; n>1 returns 400
+  "text",           // Groq rejects top-level text: {"verbosity":"low"}
 ];
 
 function stripMessageFields(msg) {

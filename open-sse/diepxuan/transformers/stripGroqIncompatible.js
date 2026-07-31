@@ -38,6 +38,12 @@ function stripFromBody(body) {
     // Keep reasoning_content at top-level for OpenAI compat (output field).
     // Per-message reasoning_content is the problem Groq rejects.
   }
+  // Groq reasoning models only accept none/default for reasoning_effort.
+  if (next.reasoning_effort !== undefined
+      && next.reasoning_effort !== "none"
+      && next.reasoning_effort !== "default") {
+    next.reasoning_effort = "default";
+  }
   if (Array.isArray(next.messages)) {
     next.messages = next.messages.map(stripFromMessage);
   }
