@@ -14,7 +14,10 @@
 import { recordComboModelResult, shouldSkipModelInCombo } from "./comboFailTracker.js";
 import { isDiepXuanEnabled } from "../../src/diepxuan/shared/config/flags.js";
 // diepxuan: rate-limit throttle engine (ADR-007 PR #61).
-import { acquireQuotaSlot, recordRequestOutcome } from "./limits/throttle.js";
+import { acquireQuotaSlot, recordRequestOutcome, estimateTokens } from "./limits/throttle.js";
+// diepxuan: context length estimation (combo skip when ctx too small).
+import { getContextLengthSync } from "./contextLength/index.js";
+import { getCapabilitiesForModel } from "../providers/capabilities.js";
 
 export function shouldSkipComboModel(modelStr, comboName) {
   if (!isDiepXuanEnabled()) return false;
@@ -58,6 +61,17 @@ export async function beforeComboModelAttempt({ modelStr, comboName, log, body, 
   const provider = slash > 0 ? modelStr.slice(0, slash) : "";
   const model = slash > 0 ? modelStr.slice(slash + 1) : modelStr;
   if (!provider || !model) return { skip: false };
+
+  // diepxuan: estimate context usage and skip model when it cannot fit.
+  // Avoids waiting for upstream 400/context-length errors before fallback.
+  const estimatedTokens = estimateTokens(body);
+  const modelCtx = getContextLengthSync(modelStr)
+    || getCapabilitiesForModel(provider, model).contextWindow
+    || 0;
+  if (modelCtx > 0 && estimatedTokens > modelCtx) {
+    log?.info?.("COMBO", `Skipping ${modelStr} (ctx too small: ${estimatedTokens} > ${modelCtx})`);
+    return { skip: true, reason: "context_too_large" };
+  }
 
   const result = await acquireQuotaSlot({
     provider, model, connectionId, body,
