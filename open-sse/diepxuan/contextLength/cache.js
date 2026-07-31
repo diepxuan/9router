@@ -9,6 +9,7 @@
  */
 
 import { getSharedDb } from "../db/sharedDb.js";
+import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 
 const SOURCE_API = "api";
 const SOURCE_ERROR = "error";
