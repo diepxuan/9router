@@ -16,6 +16,8 @@ const FORK_STRIP_RULES = [
   { provider: "nvidia", drop: ["text"] },
   // NVIDIA NIM: inject max_tokens khi client khong gui
   { provider: "nvidia", injectMaxTokens: 8192 },
+  // TokenRouter Kimi K3 Free only accepts low/high/max.
+  { provider: "tokenrouter", clampReasoningEffort: ["low", "high", "max"], defaultReasoningEffort: "high" },
 ];
 
 /**
@@ -45,6 +47,13 @@ export function applyForkParamRules(provider, body) {
         body.max_tokens === undefined &&
         body.max_completion_tokens === undefined) {
       body.max_tokens = rule.injectMaxTokens;
+    }
+
+    // Clamp reasoning_effort to provider-allowed values
+    if (Array.isArray(rule.clampReasoningEffort) && body.reasoning_effort !== undefined) {
+      if (!rule.clampReasoningEffort.includes(body.reasoning_effort)) {
+        body.reasoning_effort = rule.defaultReasoningEffort || rule.clampReasoningEffort[0];
+      }
     }
   }
 }
