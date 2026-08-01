@@ -34,7 +34,13 @@
         "src/sse/handlers/chat.js",
         "tests/unit/limits-throttle.test.mjs",
         "open-sse/services/accountFallback.js",
-        "open-sse/utils/error.js"
+        "open-sse/utils/error.js",
+        "src/app/api/models/limits/route.js",
+        "src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx",
+        "src/app/api/v1/models/route.js",
+        "tests/unit/models-limits-api.test.mjs",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+        "src/app/(dashboard)/dashboard/providers/[id]/page.js"
       ],
       "requiredPatterns": [
         {
@@ -176,6 +182,18 @@
         {
           "file": "src/sse/handlers/chat.js",
           "pattern": "connectionId: credentials.connectionId"
+        },
+        {
+          "file": "src/app/api/models/limits/route.js",
+          "pattern": "getResolvedLimits"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx",
+          "pattern": "ModelLimitBadge"
+        },
+        {
+          "file": "src/app/api/v1/models/route.js",
+          "pattern": "model.limits"
         }
       ],
       "syntaxCheck": [
@@ -631,7 +649,8 @@
         "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
         "src/app/(dashboard)/dashboard/providers/[id]/page.js",
         "src/app/api/combos/[id]/route.js",
-        "src/app/api/combos/route.js"
+        "src/app/api/combos/route.js",
+        "tests/unit/context-length-priority.test.mjs"
       ],
       "requiredPatterns": [
         {
@@ -701,6 +720,10 @@
         {
           "file": "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
           "pattern": "formatCtx"
+        },
+        {
+          "file": "open-sse/diepxuan/contextLength/index.js",
+          "pattern": "SOURCE_ERROR"
         }
       ],
       "syntaxCheck": [
@@ -731,7 +754,9 @@
         "open-sse/diepxuan/executors/mimo-free.js",
         "open-sse/executors/index.js",
         "open-sse/utils/error.js",
-        "open-sse/handlers/chatCore.js"
+        "open-sse/handlers/chatCore.js",
+        "open-sse/diepxuan/transformers/stripCodexModelMarkers.js",
+        "tests/unit/stripCodexModelMarkers.test.mjs"
       ],
       "requiredPatterns": [
         {
@@ -789,6 +814,14 @@
         {
           "file": "open-sse/handlers/chatCore.js",
           "pattern": "messageCount"
+        },
+        {
+          "file": "open-sse/diepxuan/transformers/stripCodexModelMarkers.js",
+          "pattern": "stripCodexModelMarkers"
+        },
+        {
+          "file": "open-sse/translator/index.js",
+          "pattern": "stripCodexModelMarkersFromBody"
         }
       ],
       "syntaxCheck": [

@@ -3,7 +3,7 @@
  * Combines: cache → provider API → static MODEL_INFO.
  */
 
-import { getCachedContextLength, getCachedContextLengthBatch, upsertContextLength, initContextLengthCache, SOURCE_STATIC } from "./cache.js";
+import { getCachedContextLength, getCachedContextLengthBatch, upsertContextLength, initContextLengthCache, SOURCE_STATIC, SOURCE_ERROR } from "./cache.js";
 import { fetchProviderContextLengths } from "./modelsApi.js";
 import { extractContextLengthFromError, updateContextLengthFromError } from "./errorParser.js";
 import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
@@ -58,7 +58,21 @@ export async function getContextLength(modelId) {
 export function getContextLengthBatchCached(modelIds) {
   if (!isDiepXuanEnabled()) return new Map();
   ensureInit();
-  return getCachedContextLengthBatch(modelIds || []);
+  const ids = modelIds || [];
+  const cache = getCachedContextLengthBatch(ids);
+  const result = new Map();
+  for (const id of ids) {
+    const cached = cache.get(id);
+    if (cached && cached.source !== SOURCE_ERROR) {
+      result.set(id, cached);
+    } else {
+      // Error-derived values are least trustworthy; prefer curated static.
+      const staticCtx = getStaticContextLength(id);
+      if (staticCtx) result.set(id, { contextLength: staticCtx, source: SOURCE_STATIC });
+      else if (cached) result.set(id, cached);
+    }
+  }
+  return result;
 }
 
 /**
@@ -126,9 +140,14 @@ export function getContextLengthSync(modelId) {
   ensureInit();
   if (!modelId) return null;
 
-  // 1. Cache hit
+  // 1. Cache hit (error-derived values are least trustworthy; prefer static)
   const cached = getCachedContextLength(modelId);
-  if (cached) return cached.contextLength;
+  if (cached && cached.source !== SOURCE_ERROR) return cached.contextLength;
+  if (cached && cached.source === SOURCE_ERROR) {
+    const staticCtx = getStaticContextLength(modelId);
+    if (staticCtx) return staticCtx;
+    return cached.contextLength;
+  }
 
   // 2. Static fallback
   return getStaticContextLength(modelId);
