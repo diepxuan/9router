@@ -30,6 +30,7 @@
 
 import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
 import { dbg } from "../../utils/debugLog.js";
+import { stripCodexModelMarkers } from "./stripCodexModelMarkers.js";
 
 export function captureOriginalRequestedModel(clientRawRequest, body) {
   if (!isDiepXuanEnabled()) {
@@ -91,7 +92,8 @@ export function wrapResponseBodyWithModelOverride(response, originalModel) {
       const text = decoder.decode(chunk, { stream: true });
       const { result, patched } = overrideModelInSseText(text, originalModel);
       patchCount += patched;
-      controller.enqueue(encoder.encode(result));
+      // Strip any Codex model delimiter markers that upstream generated.
+      controller.enqueue(encoder.encode(stripCodexModelMarkers(result)));
     },
     flush() {
       if (patchCount > 0) {

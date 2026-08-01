@@ -2,6 +2,7 @@ import { FORMATS } from "./formats.js";
 import { ensureToolCallIds, fixMissingToolResponses } from "./concerns/toolCall.js";
 import { sanitizeToolCallIdsForNvidia } from "../diepxuan/nvidia/cleanToolIds.js";
 import { stripBuiltinTools } from "../diepxuan/transformers/stripBuiltinTools.js";
+import { stripCodexModelMarkersFromBody } from "../diepxuan/transformers/stripCodexModelMarkers.js";
 import { prepareClaudeRequest } from "./formats/claude.js";
 import { cloakClaudeTools } from "../utils/claudeCloaking.js";
 import { filterToOpenAIFormat } from "./formats/openai.js";
@@ -133,6 +134,10 @@ export function translateRequest(sourceFormat, targetFormat, model, body, stream
     const apiKey = credentials?.accessToken || credentials?.apiKey || null;
     result = prepareClaudeRequest(result, provider, apiKey, connectionId, credentials?.rawHeaders, clientSessionId);
   }
+  // diepxuan: strip Codex model delimiter markers from conversation text
+  // so upstream models do not see/echo `]<]model[>`.
+  stripCodexModelMarkersFromBody(result);
+
   // diepxuan: strip nameless builtin tools from providers that declare
   // stripBuiltinTools in their per-format transport entry (e.g. MiniMax Claude endpoint).
   const stripCfg = credentials?.runtimeTransport?.stripBuiltinTools;

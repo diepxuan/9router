@@ -41,6 +41,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | Combo ctx skip | `open-sse/diepxuan/comboHooks.js` (`estimateTokens` + `getContextLengthSync`) |
 | UI ctx badges (combo + provider) | `combos/page.js`, `combo/[id]/page.js`, `providers/[id]/ModelRow.js` |
 | Source priority api > static > error | `contextLength/cache.js` |
+| Đọc ưu tiên static > error | `contextLength/index.js` (`getContextLengthSync`, batch) |
 
 ### 3. Rate-limit engine (ADR-007)
 
@@ -51,6 +52,9 @@ Các provider custom trong fork layer, base registry không sửa.
 | Throttle sliding window | `limits/throttle.js`, `cache.js`, `window.js` |
 | Combo fail tracker + skip | `open-sse/diepxuan/comboHooks.js`, `comboFailTracker.js`, `services/combo.js` |
 | Wire vào core | `handlers/chatCore.js`, `utils/error.js`, `services/accountFallback.js` |
+| Limits API | `src/app/api/models/limits/route.js` |
+| Limits badge UI | `src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx`, `providers/[id]/ModelRow.js`, `page.js` |
+| `/v1/models` limits enrichment | `src/app/api/v1/models/route.js` |
 
 ### 4. Fork transformers & executors
 
@@ -62,6 +66,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | Groq incompatible strip | `transformers/stripGroqIncompatible.js`, `executors/groq.js` |
 | MiMo free 441 cooldown | `executors/mimo-free.js`, `executors/index.js` |
 | Combo response model override | `transformers/responseModelOverride.js`, `chatCore.js`, `utils/stream.js` |
+| Codex model marker strip | `transformers/stripCodexModelMarkers.js`, `translator/index.js`, `responseModelOverride.js` |
 
 ### 5. UI / Dashboard
 
@@ -81,7 +86,7 @@ Các provider custom trong fork layer, base registry không sửa.
 |---|---|
 | Shared DB singleton | `open-sse/diepxuan/db/sharedDb.js` (`global._dbAdapter.instance.raw`) |
 | Feature flag | `src/diepxuan/shared/config/flags.js` (`isDiepXuanEnabled`) |
-| Debug log theo service | `open-sse/utils/debugLog.js` (`DIEPXUAN_DEBUG_LOG`) |
+| Debug log theo service | `open-sse/utils/debugLog.js` (dev: `NODE_ENV !== "production"`) |
 | dev.sh + NODE_ENV | `dev.sh` |
 | next.config allowedDevOrigins | `next.config.mjs` |
 | CI/CD pipeline | `.github/workflows/build-and-deploy.yml` |
@@ -95,6 +100,14 @@ npm run build
 ```
 
 Cả hai PASS mới push.
+
+## Unit tests mới (2026-08-01)
+
+- `tests/unit/stripCodexModelMarkers.test.mjs` — strip `[` marker trong text + body messages
+- `tests/unit/context-length-priority.test.mjs` — static 1M thắng error 256K
+- `tests/unit/models-limits-api.test.mjs` — resolved limits + inferred source
+
+Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 
 ## Smoke test nhanh
 
