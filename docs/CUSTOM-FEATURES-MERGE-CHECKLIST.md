@@ -63,6 +63,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | NVIDIA clean tool ids | `open-sse/diepxuan/nvidia/cleanToolIds.js`, `translator/index.js` |
 | NVIDIA strip text / inject max_tokens | `open-sse/diepxuan/translator/paramSupportHooks.js`, `executors/default.js` |
 | TokenRouter reasoning_effort clamp | `open-sse/diepxuan/translator/paramSupportHooks.js` (low/high/max) |
+| TokenRouter flatten assistant content | `open-sse/diepxuan/translator/paramSupportHooks.js` (array → string) |
 | Codex builtin tool pruner (config-driven) | `transformers/stripBuiltinTools.js`, `registry/minimax.js`, `minimax-cn.js` |
 | Groq incompatible strip | `transformers/stripGroqIncompatible.js`, `executors/groq.js` |
 | MiMo free 441 cooldown | `executors/mimo-free.js`, `executors/index.js` |

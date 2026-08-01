@@ -16,8 +16,9 @@ const FORK_STRIP_RULES = [
   { provider: "nvidia", drop: ["text"] },
   // NVIDIA NIM: inject max_tokens khi client khong gui
   { provider: "nvidia", injectMaxTokens: 8192 },
-  // TokenRouter Kimi K3 Free only accepts low/high/max.
+  // TokenRouter Kimi K3 Free only accepts low/high/max and string content.
   { provider: "tokenrouter", clampReasoningEffort: ["low", "high", "max"], defaultReasoningEffort: "high" },
+  { provider: "tokenrouter", flattenAssistantContent: true },
 ];
 
 /**
@@ -53,6 +54,19 @@ export function applyForkParamRules(provider, body) {
     if (Array.isArray(rule.clampReasoningEffort) && body.reasoning_effort !== undefined) {
       if (!rule.clampReasoningEffort.includes(body.reasoning_effort)) {
         body.reasoning_effort = rule.defaultReasoningEffort || rule.clampReasoningEffort[0];
+      }
+    }
+
+    // TokenRouter rejects assistant messages with array content parts;
+    // flatten text parts to a plain string.
+    if (rule.flattenAssistantContent && Array.isArray(body.messages)) {
+      for (const msg of body.messages) {
+        if (!msg || msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+        const text = msg.content
+          .filter((p) => p && p.type === "text" && typeof p.text === "string")
+          .map((p) => p.text)
+          .join("");
+        msg.content = text;
       }
     }
   }

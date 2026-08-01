@@ -29,3 +29,21 @@ test("nvidia strips text and injects max_tokens", () => {
   assert.equal(body.text, undefined);
   assert.equal(body.max_tokens, 8192);
 });
+
+test("tokenrouter flattens assistant array content to string", () => {
+  const body = {
+    messages: [
+      { role: "assistant", content: [{ type: "text", text: "hello " }, { type: "text", text: "world" }] },
+      { role: "assistant", content: [] },
+    ],
+  };
+  applyForkParamRules("tokenrouter", body);
+  assert.equal(body.messages[0].content, "hello world");
+  assert.equal(body.messages[1].content, "");
+});
+
+test("tokenrouter leaves string assistant content unchanged", () => {
+  const body = { messages: [{ role: "assistant", content: "plain" }] };
+  applyForkParamRules("tokenrouter", body);
+  assert.equal(body.messages[0].content, "plain");
+});
