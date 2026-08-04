@@ -29,6 +29,8 @@ Các provider custom trong fork layer, base registry không sửa.
 | Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
 | NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
 | OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
+| LLMGateway free/cheap gateway | `open-sse/diepxuan/registry/llmgateway.js`, `open-sse/providers/registry/index.js` |
+| Kilo Code free hosted models | `open-sse/diepxuan/registry/kilocode.js`, `open-sse/providers/registry/index.js` |
 | MiniMax stripBuiltinTools config | `open-sse/diepxuan/registry/minimax.js`, `minimax-cn.js` |
 | Wire vào registry | `open-sse/providers/registry/index.js` |
 

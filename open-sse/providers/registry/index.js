@@ -111,6 +111,8 @@ import d7 from "../../diepxuan/registry/qoder.js";
 import d8 from "../../diepxuan/registry/minimax.js";
 import d9 from "../../diepxuan/registry/minimax-cn.js";
 import d10 from "../../diepxuan/registry/openai.js";
+import d11 from "../../diepxuan/registry/llmgateway.js";
+import d12 from "../../diepxuan/registry/kilocode.js";
 export default [
   p0,
   p1,
@@ -219,4 +221,6 @@ export default [
   d8,
   d9,
   d10,
+  d11,
+  d12,
 ];

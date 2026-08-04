@@ -878,10 +878,12 @@
     },
     {
       "id": "provider-registry-expansion",
-      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, MiniMax strip config.",
+      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, LLMGateway, Kilo Code, MiniMax strip config.",
       "requiredFiles": [
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
+        "open-sse/diepxuan/registry/llmgateway.js",
+        "open-sse/diepxuan/registry/kilocode.js",
         "open-sse/providers/registry/index.js",
         "open-sse/diepxuan/registry/agnes.js",
         "open-sse/diepxuan/registry/aihubmix.js",
@@ -931,11 +933,21 @@
         {
           "file": "open-sse/providers/registry/index.js",
           "pattern": "diepxuan/registry/openai.js"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/llmgateway.js",
+          "pattern": "claude-haiku-4-5-free"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/kilocode.js",
+          "pattern": "FREE_HOSTED_MODELS"
         }
       ],
       "syntaxCheck": [
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
+        "open-sse/diepxuan/registry/llmgateway.js",
+        "open-sse/diepxuan/registry/kilocode.js",
         "open-sse/providers/registry/index.js",
         "open-sse/diepxuan/registry/agnes.js",
         "open-sse/diepxuan/registry/aihubmix.js",
@@ -965,6 +977,8 @@
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
+        "open-sse/diepxuan/registry/llmgateway.js",
+        "open-sse/diepxuan/registry/kilocode.js",
         "open-sse/diepxuan/registry/qoder.js",
         "open-sse/diepxuan/registry/tokenrouter.js",
         "open-sse/diepxuan/registry/zenmux.js",
@@ -1000,6 +1014,14 @@
         {
           "file": "open-sse/diepxuan/registry/openai.js",
           "pattern": "baseOpenai"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/llmgateway.js",
+          "pattern": "llmgateway"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/kilocode.js",
+          "pattern": "baseKilocode"
         }
       ],
       "syntaxCheck": [
@@ -1014,6 +1036,8 @@
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
+        "open-sse/diepxuan/registry/llmgateway.js",
+        "open-sse/diepxuan/registry/kilocode.js",
         "open-sse/diepxuan/registry/qoder.js",
         "open-sse/diepxuan/registry/tokenrouter.js",
         "open-sse/diepxuan/registry/zenmux.js",
