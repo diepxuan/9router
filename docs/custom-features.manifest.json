@@ -968,6 +968,26 @@
         {
           "file": "open-sse/diepxuan/registry/gemini.js",
           "pattern": "gemma-4-26b-a4b-it"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "NVIDIA_FREE_TIER_LIMITS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "MODEL_LIMIT_OVERRIDES"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/kilocode.js",
+          "pattern": "KILO_FREE_TIER_LIMITS"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "the LAST entry with the same id wins"
+        },
+        {
+          "file": "tests/unit/limits-resolution.test.mjs",
+          "pattern": "getProviderLimits reads NVIDIA free tier limits"
         }
       ],
       "syntaxCheck": [
