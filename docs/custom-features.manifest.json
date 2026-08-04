@@ -878,9 +878,10 @@
     },
     {
       "id": "provider-registry-expansion",
-      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, MiniMax strip config.",
+      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, MiniMax strip config.",
       "requiredFiles": [
         "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/openai.js",
         "open-sse/providers/registry/index.js",
         "open-sse/diepxuan/registry/agnes.js",
         "open-sse/diepxuan/registry/aihubmix.js",
@@ -918,10 +919,23 @@
         {
           "file": "open-sse/diepxuan/registry/groq.js",
           "pattern": "baseGroq"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/openai.js",
+          "pattern": "REMOVED_MODEL_IDS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/openai.js",
+          "pattern": "gpt-5.6-sol"
+        },
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry/openai.js"
         }
       ],
       "syntaxCheck": [
         "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/openai.js",
         "open-sse/providers/registry/index.js",
         "open-sse/diepxuan/registry/agnes.js",
         "open-sse/diepxuan/registry/aihubmix.js",
@@ -950,6 +964,7 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/openai.js",
         "open-sse/diepxuan/registry/qoder.js",
         "open-sse/diepxuan/registry/tokenrouter.js",
         "open-sse/diepxuan/registry/zenmux.js",
@@ -981,6 +996,10 @@
         {
           "file": "open-sse/diepxuan/translator/paramSupportHooks.js",
           "pattern": "applyForkParamRules"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/openai.js",
+          "pattern": "baseOpenai"
         }
       ],
       "syntaxCheck": [
@@ -994,6 +1013,7 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/nvidia.js",
+        "open-sse/diepxuan/registry/openai.js",
         "open-sse/diepxuan/registry/qoder.js",
         "open-sse/diepxuan/registry/tokenrouter.js",
         "open-sse/diepxuan/registry/zenmux.js",

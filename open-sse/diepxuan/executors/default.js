@@ -21,7 +21,7 @@ export class DiepxuanDefaultExecutor extends DefaultExecutor {
   transformRequest(model, body) {
     const result = super.transformRequest(model, body);
     if (result && typeof result === "object") {
-      applyForkParamRules(this.provider, result);
+      applyForkParamRules(this.provider, result, model);
     }
     return result;
   }

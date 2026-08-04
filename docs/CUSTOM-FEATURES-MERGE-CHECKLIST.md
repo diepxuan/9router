@@ -28,6 +28,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | Groq expansion + capabilities | `open-sse/diepxuan/registry/groq.js`, `open-sse/providers/capabilities.js` |
 | Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
 | NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
+| OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
 | MiniMax stripBuiltinTools config | `open-sse/diepxuan/registry/minimax.js`, `minimax-cn.js` |
 | Wire vào registry | `open-sse/providers/registry/index.js` |
 
@@ -62,6 +63,7 @@ Các provider custom trong fork layer, base registry không sửa.
 |---|---|
 | NVIDIA clean tool ids | `open-sse/diepxuan/nvidia/cleanToolIds.js`, `translator/index.js` |
 | NVIDIA strip text / inject max_tokens | `open-sse/diepxuan/translator/paramSupportHooks.js`, `executors/default.js` |
+| OpenAI Chat Completions param quirks | Strip `text` and incompatible `reasoning_effort` in `open-sse/diepxuan/translator/paramSupportHooks.js` |
 | TokenRouter reasoning_effort clamp | `open-sse/diepxuan/translator/paramSupportHooks.js` (low/high/max) |
 | TokenRouter flatten assistant content | `open-sse/diepxuan/translator/paramSupportHooks.js` (array → string) |
 | Codex builtin tool pruner (config-driven) | `transformers/stripBuiltinTools.js`, `registry/minimax.js`, `minimax-cn.js` |
@@ -124,3 +126,12 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - PR chỉ tạo trên `diepxuan/9router`, không lên upstream `decolua/9router`.
 - Không push trực tiếp main/master.
 - Nếu sửa base file, ghi rõ lý do ở commit.
+
+### 2026-08-04 - OpenAI Chat Completions compatibility
+
+- Added fork-layer OpenAI registry override: `open-sse/diepxuan/registry/openai.js`.
+- Verified official OpenAI latest-model docs: `gpt-5.6` aliases to `gpt-5.6-sol`; Responses API is recommended for reasoning/tool-calling workflows.
+- Kept OpenAI API provider on Chat Completions and removed/filtered non-chat or deprecated model slugs from its registry.
+- Added Chat Completions quirks: strip `text` and force `reasoning_effort: "none"` when tools are present for `gpt-5.4*`, `gpt-5.5`, and `gpt-5.6-*`.
+- Cleaned NVIDIA EOL model ids and added static context length for `z-ai/glm-5.2` (200k).
+- Smoke tests: `node --test tests/unit/paramSupportHooks.test.mjs tests/unit/openai-fork-registry.test.mjs`, `node --check` target files, registry import, fork custom-feature checker.
