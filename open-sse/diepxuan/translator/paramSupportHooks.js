@@ -14,6 +14,15 @@ import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js"
 const FORK_STRIP_RULES = [
   // NVIDIA NIM: strip `text` param
   { provider: "nvidia", drop: ["text"] },
+  // OpenAI Chat Completions: `text: {"verbosity":...}` chi hop le tren
+  // Responses API (/v1/responses). Mot so client inject "text" khi dich sang
+  // chat/completions -> OpenAI 400 "Unknown parameter: text". Strip de tranh 400.
+  { provider: "openai", drop: ["text"] },
+  // OpenAI gpt-5.4*/5.5/5.6: function tools + reasoning_effort(!=none) -> 400.
+  // Probe 2026-08-04: gpt-5.6* still errors when the field is omitted, so set none.
+  { provider: "openai", setIfTools: { reasoning_effort: "none" }, modelMatch: /^gpt-5\.(4|5|6)/ },
+  // OpenAI legacy non-reasoning (gpt-4o, gpt-4.1, gpt-4-turbo) rejects reasoning_effort param entirely.
+  { provider: "openai", drop: ["reasoning_effort"], modelMatch: /^gpt-4/ },
   // NVIDIA NIM: inject max_tokens khi client khong gui
   { provider: "nvidia", injectMaxTokens: 8192 },
   // TokenRouter Kimi K3 Free only accepts low/high/max and string content.
@@ -29,17 +38,30 @@ const FORK_STRIP_RULES = [
  * @param {string} provider
  * @param {object} body - request body (mutated in place)
  */
-export function applyForkParamRules(provider, body) {
+export function applyForkParamRules(provider, body, model = body?.model) {
   if (!isDiepXuanEnabled()) return;
   if (!provider || !body || typeof body !== "object") return;
 
   for (const rule of FORK_STRIP_RULES) {
     if (rule.provider && rule.provider !== provider) continue;
+    if (rule.modelMatch && !(typeof model === "string" && rule.modelMatch.test(model))) continue;
 
     // Strip params
     if (Array.isArray(rule.drop)) {
       for (const key of rule.drop) {
         if (body[key] !== undefined) delete body[key];
+      }
+    }
+
+    // Mutate params only when tool definitions are present.
+    if (Array.isArray(body.tools) && body.tools.length > 0) {
+      if (Array.isArray(rule.dropIfTools)) {
+        for (const key of rule.dropIfTools) {
+          if (body[key] !== undefined) delete body[key];
+        }
+      }
+      if (rule.setIfTools && typeof rule.setIfTools === "object") {
+        Object.assign(body, rule.setIfTools);
       }
     }
 

@@ -110,6 +110,7 @@ import d6 from "../../diepxuan/registry/nvidia.js";
 import d7 from "../../diepxuan/registry/qoder.js";
 import d8 from "../../diepxuan/registry/minimax.js";
 import d9 from "../../diepxuan/registry/minimax-cn.js";
+import d10 from "../../diepxuan/registry/openai.js";
 export default [
   p0,
   p1,
@@ -217,4 +218,5 @@ export default [
   d7,
   d8,
   d9,
+  d10,
 ];

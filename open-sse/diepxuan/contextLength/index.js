@@ -88,6 +88,7 @@ const MODEL_INFO = {
   "qwen/qwen3.5-397b-a17b": 262144,
   "qwen/qwen3.5-122b-a10b": 262144,
   "z-ai/glm-5.1": 200000,
+  "z-ai/glm-5.2": 200000,
   "mistralai/mistral-medium-3.5-128b": 128000,
   "nvidia/llama-3.3-nemotron-super-49b-v1": 131072,
   "nvidia/llama-3.3-nemotron-super-49b-v1.5": 131072,

@@ -2,8 +2,10 @@
 //
 // Base `open-sse/providers/registry/nvidia.js` is unchanged. This module
 // applies DiepXuan-only adjustments:
-//   1. Remove `minimaxai/minimax-m2.7` — this model moved to Groq hosting
-//      (verified via live API on 2026-07-30).
+//   1. Remove EOL / moved-away models (verified via live API):
+//      - minimaxai/minimax-m2.7 (EOL 2026-07-27, moved to Groq hosting)
+//      - mistralai/mistral-large-3-675b-instruct-2512 (EOL 2026-07-23)
+//      - qwen/qwen3-coder-480b-a35b-instruct (EOL 2026-06-11)
 //   2. Add/refresh NVIDIA NIM free model catalog (verified via
 //      https://integrate.api.nvidia.com/v1/models on 2026-07-31).
 //
@@ -19,6 +21,8 @@ function isForkEnabled() {
 // Removed from NVIDIA free tier (EOL / moved to other host).
 const REMOVED_MODEL_IDS = new Set([
   "minimaxai/minimax-m2.7",
+  "mistralai/mistral-large-3-675b-instruct-2512",
+  "qwen/qwen3-coder-480b-a35b-instruct",
 ]);
 
 // Additional free models verified from NVIDIA NIM live catalog.

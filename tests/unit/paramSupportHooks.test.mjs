@@ -47,3 +47,30 @@ test("tokenrouter leaves string assistant content unchanged", () => {
   applyForkParamRules("tokenrouter", body);
   assert.equal(body.messages[0].content, "plain");
 });
+
+test("openai strips Responses-only text param for Chat Completions", () => {
+  const body = { text: { verbosity: "low" }, reasoning_effort: "medium" };
+  applyForkParamRules("openai", body, "gpt-5.5");
+  assert.equal(body.text, undefined);
+  assert.equal(body.reasoning_effort, "medium");
+});
+
+test("openai forces reasoning_effort none for gpt-5.4/5.5/5.6 tool calls", () => {
+  for (const model of ["gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6", "gpt-5.6-sol"]) {
+    const body = { tools: [{ type: "function" }], reasoning_effort: "medium" };
+    applyForkParamRules("openai", body, model);
+    assert.equal(body.reasoning_effort, "none", model);
+  }
+});
+
+test("openai leaves reasoning_effort unchanged for compatible gpt-5.2 tool calls", () => {
+  const body = { tools: [{ type: "function" }], reasoning_effort: "medium" };
+  applyForkParamRules("openai", body, "gpt-5.2");
+  assert.equal(body.reasoning_effort, "medium");
+});
+
+test("openai strips reasoning_effort from gpt-4 chat requests", () => {
+  const body = { tools: [{ type: "function" }], reasoning_effort: "medium" };
+  applyForkParamRules("openai", body, "gpt-4.1");
+  assert.equal(body.reasoning_effort, undefined);
+});
