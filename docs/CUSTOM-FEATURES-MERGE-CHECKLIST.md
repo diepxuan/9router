@@ -31,8 +31,11 @@ Các provider custom trong fork layer, base registry không sửa.
 | OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
 | LLMGateway free/cheap gateway | `open-sse/diepxuan/registry/llmgateway.js`, `open-sse/providers/registry/index.js` |
 | Kilo Code free hosted models | `open-sse/diepxuan/registry/kilocode.js`, `open-sse/providers/registry/index.js` |
+| Gemini free tier models | `open-sse/diepxuan/registry/gemini.js`, `open-sse/providers/registry/index.js`, `src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx`, `src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` |
 | MiniMax stripBuiltinTools config | `open-sse/diepxuan/registry/minimax.js`, `minimax-cn.js` |
 | Wire vào registry | `open-sse/providers/registry/index.js` |
+
+`src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` là base file; chỉ thêm import + render badge từ fork layer (`ModelFreeBadge.jsx`) để hiển thị model free.
 
 ### 2. Context length system
 

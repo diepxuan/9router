@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
 import { CapacityBadges } from "@/shared/components";
 import ModelLimitBadge from "@/diepxuan/app/dashboard/providers/ModelLimitBadge";
+import ModelFreeBadge from "@/diepxuan/app/dashboard/providers/ModelFreeBadge";
 
 function formatCtx(n) {
   if (!Number.isFinite(n) || n <= 0) return "";
@@ -70,6 +71,7 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
             {copied === `model-${model.id}` ? "Copied!" : "Copy"}
           </span>
         </div>
+        <ModelFreeBadge free={isFree} />
         {isCustom ? (
           <button
             onClick={onDeleteAlias}

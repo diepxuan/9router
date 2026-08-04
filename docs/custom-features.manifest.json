@@ -878,7 +878,7 @@
     },
     {
       "id": "provider-registry-expansion",
-      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, LLMGateway, Kilo Code, MiniMax strip config.",
+      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, LLMGateway, Kilo Code, MiniMax strip config. Gemini free tier override.",
       "requiredFiles": [
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
@@ -895,7 +895,10 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/providers/capabilities.js",
         "open-sse/handlers/imageProviders/index.js",
-        "src/app/api/providers/[id]/test/testUtils.js"
+        "src/app/api/providers/[id]/test/testUtils.js",
+        "open-sse/diepxuan/registry/gemini.js",
+        "src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js"
       ],
       "requiredPatterns": [
         {
@@ -941,6 +944,26 @@
         {
           "file": "open-sse/diepxuan/registry/kilocode.js",
           "pattern": "FREE_HOSTED_MODELS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/gemini.js",
+          "pattern": "FREE_MODEL_IDS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/gemini.js",
+          "pattern": "gemini-3.6-flash"
+        },
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry/gemini.js"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx",
+          "pattern": "ModelFreeBadge"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+          "pattern": "ModelFreeBadge"
         }
       ],
       "syntaxCheck": [
@@ -959,7 +982,8 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/providers/capabilities.js",
         "open-sse/handlers/imageProviders/index.js",
-        "src/app/api/providers/[id]/test/testUtils.js"
+        "src/app/api/providers/[id]/test/testUtils.js",
+        "open-sse/diepxuan/registry/gemini.js"
       ]
     },
     {

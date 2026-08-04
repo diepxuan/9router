@@ -113,6 +113,7 @@ import d9 from "../../diepxuan/registry/minimax-cn.js";
 import d10 from "../../diepxuan/registry/openai.js";
 import d11 from "../../diepxuan/registry/llmgateway.js";
 import d12 from "../../diepxuan/registry/kilocode.js";
+import d13 from "../../diepxuan/registry/gemini.js";
 export default [
   p0,
   p1,
@@ -223,4 +224,5 @@ export default [
   d10,
   d11,
   d12,
+  d13,
 ];
