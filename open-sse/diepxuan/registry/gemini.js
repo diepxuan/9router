@@ -22,6 +22,7 @@ const FREE_MODEL_IDS = new Set([
   "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
+  "gemma-4-26b-a4b-it",
   "gemma-4-31b-it",
 ]);
 
@@ -31,6 +32,7 @@ const ADDITIONAL_FREE_MODELS = [
   { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash" },
   { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite" },
   { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash-Lite" },
+  { id: "gemma-4-26b-a4b-it", name: "Gemma 4 26B A4B IT" },
 ];
 
 const mergedModels = (baseGemini.models || []).map((model) => ({
@@ -49,7 +51,8 @@ for (const model of ADDITIONAL_FREE_MODELS) {
 const freeTierText =
   "Free tier via AI Studio: Gemini 3.6 Flash, Gemini 3.5 Flash, " +
   "Gemini 3.5 Flash-Lite, Gemini 3.1 Flash-Lite, Gemini 3 Flash Preview, " +
-  "Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash-Lite, Gemma 4.";
+  "Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.5 Flash-Lite, " +
+  "Gemma 4 26B A4B and Gemma 4 31B.";
 
 const override = {
   ...baseGemini,
