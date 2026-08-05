@@ -94,7 +94,9 @@ const MODEL_INFO = {
   "nvidia/llama-3.3-nemotron-super-49b-v1.5": 131072,
   "nvidia/nemotron-3-super-120b-a12b": 1048576,
   "nvidia/nemotron-3-ultra-550b-a55b": 1048576,
-  "google/gemma-4-31b-it": 32768
+  "google/gemma-4-31b-it": 262144,
+  "gemma-4-26b-a4b-it": 262144,
+  "gemma-4-31b-it": 262144
 };
 
 /**

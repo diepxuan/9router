@@ -28,11 +28,22 @@ Các provider custom trong fork layer, base registry không sửa.
 | Groq expansion + capabilities | `open-sse/diepxuan/registry/groq.js`, `open-sse/providers/capabilities.js` |
 | Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
 | NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
+| NVIDIA + Kilo Code rate limits (provider/override tiers) | `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs` |
 | OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
 | LLMGateway free/cheap gateway | `open-sse/diepxuan/registry/llmgateway.js`, `open-sse/providers/registry/index.js` |
 | Kilo Code free hosted models | `open-sse/diepxuan/registry/kilocode.js`, `open-sse/providers/registry/index.js` |
+| Gemini free tier models | `open-sse/diepxuan/registry/gemini.js`, `open-sse/providers/registry/index.js`, `src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx`, `src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` |
 | MiniMax stripBuiltinTools config | `open-sse/diepxuan/registry/minimax.js`, `minimax-cn.js` |
 | Wire vào registry | `open-sse/providers/registry/index.js` |
+
+`src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` là base file; chỉ thêm import + render badge từ fork layer (`ModelFreeBadge.jsx`) để hiển thị model free.
+
+### 2026-08-05 — Rate-limit registry overrides + resolver fix
+
+- **Feature:** Khai báo `limits` trong NVIDIA registry (provider-level 40 rpm / 1M tpm / concurrency 5 + model override `z-ai/glm-5.2` = 30 rpm, 500k tpm) và Kilo Code (provider-level 200 rph / 4 rpm).
+- **Bug fix:** `open-sse/diepxuan/limits/index.js findRegistryEntry` trả entry đầu tiên thay vì entry cuối, khiến fork overrides (ví dụ limits NVIDIA/Kilo) bị base entry (id trùng) shadow. Đã sửa lấy **last match** đúng semantics "last wins".
+- **File đổi:** `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs`.
+- **Smoke test:** `node --test tests/unit/limits-resolution.test.mjs` pass 26/26.
 
 ### 2. Context length system
 

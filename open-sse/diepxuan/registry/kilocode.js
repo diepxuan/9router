@@ -5,7 +5,7 @@
 // free-tier capable source and seeds current free hosted models.
 //
 // Free model catalog verified from https://api.kilo.ai/api/gateway/models
-// on 2026-08-04. The live `modelsFetcher` still refreshes the full catalog;
+// on 2026-08-05 (12 models). The live `modelsFetcher` still refreshes the full catalog;
 // these seeds matter when the fetcher is unavailable or a login has not yet
 // loaded the account-specific model list.
 //
@@ -22,6 +22,7 @@ const FREE_HOSTED_MODELS = [
   { id: "cohere/north-mini-code:free", name: "North Mini Code (Free)" },
   { id: "inclusionai/ling-3.0-flash:free", name: "Ling 3.0 Flash (Free)" },
   { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", name: "Nemotron 3 Nano Omni (Free)" },
+  { id: "nvidia/nemotron-3.5-content-safety:free", name: "Nemotron 3.5 Content Safety (Free)" },
   { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super (Free)" },
   { id: "nvidia/nemotron-3-ultra-550b-a55b:free", name: "Nemotron 3 Ultra (Free)" },
   { id: "poolside/laguna-s-2.1:free", name: "Laguna S 2.1 (Free)" },
@@ -39,9 +40,19 @@ for (const model of FREE_HOSTED_MODELS) {
   }
 }
 
+// Free hosted models on Kilo Gateway are capped at 200 requests/hour
+// (per Sếp directive 2026-08-05). rpm ~4 keeps bursts under the hourly cap;
+// the throttle treats rph as authoritative.
+const KILO_FREE_TIER_LIMITS = {
+  rph: 200,
+  rpm: 4,
+  source: "kilo-gateway free tier 200 rph",
+};
+
 const override = {
   ...baseKilocode,
   hasFree: true,
+  limits: KILO_FREE_TIER_LIMITS,
   models: mergedModels,
   display: {
     ...baseKilocode.display,

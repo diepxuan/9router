@@ -30,12 +30,21 @@ import { inferLimitsFromContext } from "./inference.js";
  * the `limits` block at the top and the `models[]` array with per-model
  * limits. Defensive against missing registry.
  *
+ * Registry semantics: fork overrides are appended AFTER the base entry and
+ * the LAST entry with the same id wins (see diepxuan/registry/*.js wiring).
+ * So this must use the last match, not the first — otherwise fork-declared
+ * limits (e.g. NVIDIA free tier, Kilo 200 rph) get shadowed by the base entry.
+ *
  * @param {string} provider
  * @returns {object|null}
  */
 function findRegistryEntry(provider) {
   if (!Array.isArray(REGISTRY)) return null;
-  return REGISTRY.find((e) => e && (e.id === provider || e.alias === provider)) || null;
+  let found = null;
+  for (const e of REGISTRY) {
+    if (e && (e.id === provider || e.alias === provider)) found = e;
+  }
+  return found;
 }
 
 /**

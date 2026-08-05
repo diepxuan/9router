@@ -878,7 +878,7 @@
     },
     {
       "id": "provider-registry-expansion",
-      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, LLMGateway, Kilo Code, MiniMax strip config.",
+      "description": "Provider registry & capabilities: AIHubMix, TokenRouter, ZenMux, Agnes, Groq, Qoder, NVIDIA free catalog, OpenAI chat registry, LLMGateway, Kilo Code, MiniMax strip config. Gemini free tier override.",
       "requiredFiles": [
         "open-sse/diepxuan/registry/nvidia.js",
         "open-sse/diepxuan/registry/openai.js",
@@ -895,7 +895,10 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/providers/capabilities.js",
         "open-sse/handlers/imageProviders/index.js",
-        "src/app/api/providers/[id]/test/testUtils.js"
+        "src/app/api/providers/[id]/test/testUtils.js",
+        "open-sse/diepxuan/registry/gemini.js",
+        "src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx",
+        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js"
       ],
       "requiredPatterns": [
         {
@@ -941,6 +944,50 @@
         {
           "file": "open-sse/diepxuan/registry/kilocode.js",
           "pattern": "FREE_HOSTED_MODELS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/gemini.js",
+          "pattern": "FREE_MODEL_IDS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/gemini.js",
+          "pattern": "gemini-3.6-flash"
+        },
+        {
+          "file": "open-sse/providers/registry/index.js",
+          "pattern": "diepxuan/registry/gemini.js"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/providers/ModelFreeBadge.jsx",
+          "pattern": "ModelFreeBadge"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
+          "pattern": "ModelFreeBadge"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/gemini.js",
+          "pattern": "gemma-4-26b-a4b-it"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "NVIDIA_FREE_TIER_LIMITS"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/nvidia.js",
+          "pattern": "MODEL_LIMIT_OVERRIDES"
+        },
+        {
+          "file": "open-sse/diepxuan/registry/kilocode.js",
+          "pattern": "KILO_FREE_TIER_LIMITS"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "the LAST entry with the same id wins"
+        },
+        {
+          "file": "tests/unit/limits-resolution.test.mjs",
+          "pattern": "getProviderLimits reads NVIDIA free tier limits"
         }
       ],
       "syntaxCheck": [
@@ -959,7 +1006,8 @@
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/providers/capabilities.js",
         "open-sse/handlers/imageProviders/index.js",
-        "src/app/api/providers/[id]/test/testUtils.js"
+        "src/app/api/providers/[id]/test/testUtils.js",
+        "open-sse/diepxuan/registry/gemini.js"
       ]
     },
     {

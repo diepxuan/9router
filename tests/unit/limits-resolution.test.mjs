@@ -29,13 +29,34 @@ const {
 
 // ── Provider / model registry reads ───────────────────────────────────
 test("getProviderLimits returns null for providers without limits block", () => {
-  assert.equal(getProviderLimits("nvidia"), null);
   assert.equal(getProviderLimits("does-not-exist"), null);
 });
 
+test("getProviderLimits reads NVIDIA free tier limits from fork registry", () => {
+  const lim = getProviderLimits("nvidia");
+  assert.ok(lim, "nvidia limits block must exist");
+  assert.equal(lim.rpm, 40);
+  assert.equal(lim.tpm, 1_000_000);
+  assert.equal(lim.concurrency, 5);
+  assert.match(lim.source, /nvidia/i);
+});
+
+test("getProviderLimits reads Kilo Code free tier limits from fork registry", () => {
+  const lim = getProviderLimits("kilocode");
+  assert.ok(lim, "kilocode limits block must exist");
+  assert.equal(lim.rph, 200);
+  assert.match(lim.source, /kilo/i);
+});
+
 test("getModelLimits returns null for models without limits field", () => {
-  assert.equal(getModelLimits("nvidia", "z-ai/glm-5.2"), null);
   assert.equal(getModelLimits("nvidia", "does-not-exist"), null);
+});
+
+test("getModelLimits reads z-ai/glm-5.2 override from fork registry", () => {
+  const lim = getModelLimits("nvidia", "z-ai/glm-5.2");
+  assert.ok(lim, "glm-5.2 limits must exist");
+  assert.equal(lim.rpm, 30);
+  assert.equal(lim.tpm, 500_000);
 });
 
 // ── Connection limits parsing ─────────────────────────────────────────
@@ -183,15 +204,32 @@ test("inferLimitsFromContext returns null on invalid input", () => {
 // ── getResolvedLimits: full chain ──────────────────────────────────────
 test("getResolvedLimits returns null when no layer provides limits", () => {
   assert.equal(
-    getResolvedLimits({ provider: "nvidia", model: "z-ai/glm-5.2", connectionId: null }),
+    getResolvedLimits({ provider: "does-not-exist", model: "does-not-exist", connectionId: null }),
     null
   );
 });
 
-test("getResolvedLimits falls back to inference when no registry declared", () => {
+test("getResolvedLimits prefers registry over inference", () => {
+  // NVIDIA glm-5.2 now has a registry override (30 rpm / 500k tpm), so the
+  // inferred-from-context fallback must NOT win even when contextWindow is
+  // huge. Precedence verified via the source chain label.
   const r = getResolvedLimits({
     provider: "nvidia",
     model: "z-ai/glm-5.2",
+    connectionId: null,
+    contextWindow: 1_000_000,
+    isFreeTier: true,
+  });
+  assert.equal(r.rpm, 30);
+  assert.equal(r.tpm, 500_000);
+  assert.equal(r.concurrency, 5);
+  assert.match(r.source, /build\.nvidia/i);
+});
+
+test("getResolvedLimits falls back to inference when no registry declared", () => {
+  const r = getResolvedLimits({
+    provider: "unregistered-provider",
+    model: "unregistered-model",
     connectionId: null,
     contextWindow: 1_000_000,
     isFreeTier: true,
