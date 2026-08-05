@@ -127,22 +127,22 @@ test("acquireQuotaSlot returns acquired=true when no limits configured", async (
   assert.equal(result.limits, null);
 });
 
-test("acquireQuotaSlot waits when policy=wait-then-send and wait is short", async () => {
-  const scope = buildScope("c-wait", "nvidia", "z-ai/glm-5.2");
-  clearCounter(scope, "rpm");
-  // Fill up to limit
+test("acquireQuotaSlot enforces fallback when limit exceeded", async () => {
+  const connectionId = "c-wait-enforce";
+  // Fill up to limit for a dummy provider
   const now = Date.now();
-  for (let i = 0; i < 40; i++) pushEvent(scope, "rpm", WINDOW_MS.rpm, now - (40 - i) * 100, 0);
-  // Inject limits into the test by mocking provider registry? Skipped — instead
-  // verify that with no provider limits, behavior is correct (skip → acquired=true).
+  for (let i = 0; i < 40; i++) {
+    recordRequestOutcome({ provider: "nvidia", model: "z-ai/glm-5.2", connectionId });
+  }
+
   const r = await acquireQuotaSlot({
     provider: "nvidia",
     model: "z-ai/glm-5.2",
-    connectionId: "c-wait",
+    connectionId,
   });
-  assert.equal(r.acquired, true);
-  // No limits declared in registry yet, so no throttle.
-  assert.equal(r.limits, null);
+  // NVIDIA glm-5.2 is capped at 30 rpm in registry -> 40 requests breaches limit -> rejected/fallback
+  assert.equal(r.acquired, false);
+  assert.ok(r.reason);
 });
 
 test("acquireQuotaSlot + recordRequestOutcome round-trip", async () => {

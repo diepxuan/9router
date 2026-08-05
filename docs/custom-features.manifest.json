@@ -988,6 +988,22 @@
         {
           "file": "tests/unit/limits-resolution.test.mjs",
           "pattern": "getProviderLimits reads NVIDIA free tier limits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getResolvedKeyTotalLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/index.js",
+          "pattern": "getResolvedKeyModelLimits"
+        },
+        {
+          "file": "open-sse/diepxuan/limits/throttle.js",
+          "pattern": "buildKeyTotalScope"
+        },
+        {
+          "file": "tests/unit/three-tier-limits.test.mjs",
+          "pattern": "3-Tier Throttle Enforcement"
         }
       ],
       "syntaxCheck": [

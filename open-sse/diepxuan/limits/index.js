@@ -196,3 +196,64 @@ export function getResolvedLimits({ provider, model, connectionId, connection, c
 // Re-export the pure parser for tests / external callers
 export { extractLimitsFromError } from "./errorParser.js";
 export { recordAutoDiscoveredLimits, initAutoDiscoveredLimitsTable } from "./autoDiscovery.js";
+
+
+// ─── 3-Tier Granular Limits (Key Total, Key Per-Model, Model Global) ──
+
+/**
+ * Read Key Total limits from registry or connection data.
+ * Applied across ALL models sharing this connection/key.
+ */
+export function getProviderKeyLimits(provider) {
+  if (!isDiepXuanEnabled() || !provider) return null;
+  const reg = findRegistryEntry(provider);
+  return reg ? (reg.keyLimits || null) : null;
+}
+
+export function getKeyLimitsFromConnectionObj(connection) {
+  if (!isDiepXuanEnabled() || !connection) return null;
+  let data = connection.data;
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch (_) { return null; }
+  }
+  return (data && typeof data === "object") ? (data.keyLimits || null) : null;
+}
+
+export function getResolvedKeyTotalLimits({ provider, connection }) {
+  if (!isDiepXuanEnabled()) return null;
+  const connKey = getKeyLimitsFromConnectionObj(connection);
+  const provKey = getProviderKeyLimits(provider);
+  return mergeLimits(connKey, provKey);
+}
+
+/**
+ * Read Key Per-Model limits from connection data or registry model entry.
+ * Applied to a specific model when invoked through this key/connection.
+ */
+export function getKeyModelLimitsFromConnectionObj(connection, model) {
+  if (!isDiepXuanEnabled() || !connection || !model) return null;
+  let data = connection.data;
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch (_) { return null; }
+  }
+  if (!data || typeof data !== "object") return null;
+  if (data.modelLimits && typeof data.modelLimits === "object") {
+    return data.modelLimits[model] || null;
+  }
+  return null;
+}
+
+export function getRegistryKeyModelLimits(provider, model) {
+  if (!isDiepXuanEnabled() || !provider || !model) return null;
+  const reg = findRegistryEntry(provider);
+  if (!reg || !Array.isArray(reg.models)) return null;
+  const entry = reg.models.find((m) => m && m.id === model);
+  return entry ? (entry.keyLimits || entry.modelLimitsPerKey || null) : null;
+}
+
+export function getResolvedKeyModelLimits({ provider, model, connection }) {
+  if (!isDiepXuanEnabled()) return null;
+  const connKeyModel = getKeyModelLimitsFromConnectionObj(connection, model);
+  const regKeyModel = getRegistryKeyModelLimits(provider, model);
+  return mergeLimits(connKeyModel, regKeyModel);
+}

@@ -45,6 +45,15 @@ Các provider custom trong fork layer, base registry không sửa.
 - **File đổi:** `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs`.
 - **Smoke test:** `node --test tests/unit/limits-resolution.test.mjs` pass 26/26.
 
+### 2026-08-05 — 3-Tier Rate Limits Enforcement (Key Total + Key Per-Model + Model Global)
+
+- **Feature:** Nâng cấp hệ thống rate limits từ 1 tầng per-model sang **3 tầng độc lập**:
+  1. **Key Total (`keyLimits`)**: Tổng tất cả model dùng chung 1 key/connection (scope `conn:<id>:<provider>/*`).
+  2. **Key Per-Model (`modelLimitsPerKey` / `connection.modelLimits[model]`)**: Giới hạn của 1 key khi dùng cho 1 model cụ thể (scope `conn:<id>:<provider>/<model>`).
+  3. **Model Global (`modelLimits` / `provider.limits` / `auto` / `inferred`)**: Giới hạn chung của model đó toàn hệ thống (scope `global:<provider>/<model>`).
+- **File đổi:** `open-sse/diepxuan/limits/index.js`, `open-sse/diepxuan/limits/throttle.js`, `tests/unit/three-tier-limits.test.mjs`.
+- **Smoke test:** `node --test tests/unit/three-tier-limits.test.mjs` pass 6/6; toàn bộ 55 rate limit tests pass; `check-custom-features.mjs` pass 771/771.
+
 ### 2. Context length system
 
 | Feature | File chính |
