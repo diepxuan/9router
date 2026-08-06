@@ -140,14 +140,9 @@ export async function acquireQuotaSlot({
 
   const keyTotalLimits = getResolvedKeyTotalLimits({ provider, connection: conn });
   const keyModelLimits = getResolvedKeyModelLimits({ provider, model, connection: conn });
-  // Model Global: explicitly skips the connection-key layer so that
-  // user-configured `connection.limits` is NEVER counted on the
-  // global scope. (That was a real bug in the prior commit — a key's
-  // override would block all other keys sharing the same model.)
-  // Model Global: explicitly skips the connection-key layer so that
-  // a key's `connection.limits` is NEVER counted on the global scope.
-  // (This was a real bug in the prior commit — a key's override would
-  // block all other keys sharing the same model via the global tier.)
+  // Model Global skips the connection-key layer so a key's `connection.limits`
+  // can never leak into the global scope and block other keys sharing the
+  // same model. (This was a real bug in the prior commit — see fix fde7a0a2.)
   const modelGlobalLimits = getResolvedLimits({
     provider, model, connection: conn, contextWindow, isFreeTier,
     skipConnectionLayer: true,
@@ -157,11 +152,24 @@ export async function acquireQuotaSlot({
     return { acquired: true, limits: null };
   }
 
-  // effectiveLimits is the union of all configured tiers. Later (lower
-  // priority) tiers only fill in fields the higher tiers didn't set.
-  const effectiveLimits = [modelGlobalLimits, keyModelLimits, keyTotalLimits]
+  // effectiveLimits is the union of all configured tiers, with the
+  // following precedence (highest → lowest):
+  //   modelGlobal > keyModel > keyTotal
+  // Reduce spreads `l` LAST so the first element in the array ends
+  // up as the lowest-priority fill. Putting modelGlobal last means
+  // its rpm/tpm/concurrency win; keyTotal at index 0 only fills
+  // fields nothing else set. policy/maxWaitMs follow the same rule
+  // so the strictest tier's behaviour always wins (e.g. modelGlobal
+  // policy=reject-429 must NOT be downgraded to keyTotal's
+  // wait-then-send by the union).
+  //
+  // NOTE: the actual acquire/wait decision is per-scope (key_total,
+  // key_model, model_global counters are independent), so the
+  // effectiveLimits value is only used for policy + maxWaitMs +
+  // logging. A breach on ANY scope still surfaces its own reason.
+  const effectiveLimits = [keyTotalLimits, keyModelLimits, modelGlobalLimits]
     .filter(Boolean)
-    .reduce((acc, l) => ({ ...l, ...acc }), null);
+    .reduce((acc, l) => ({ ...acc, ...l }), null);
   const policy = effectiveLimits.policy || DEFAULT_POLICY;
   const waitCap = Number.isFinite(maxWaitMs) ? maxWaitMs
     : Number.isFinite(effectiveLimits.maxWaitMs) ? effectiveLimits.maxWaitMs

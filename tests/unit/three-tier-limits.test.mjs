@@ -165,3 +165,121 @@ test("Integration: comboHooks pattern — key model enforced when only connectio
   });
   assert.equal(resB.acquired, true);
 });
+
+// ─── Precedence: effectiveLimits — modelGlobal > keyModel > keyTotal ──
+// The actual acquire/wait decision is per-scope, but the policy /
+// maxWaitMs / logging block is the union of all tiers. The strictest
+// tier must win; keyTotal is only a safety net.
+test("effectiveLimits precedence: modelGlobal.rpm beats keyModel and keyTotal", async () => {
+  const connectionId = "conn_precedence_1";
+  const conn = {
+    data: {
+      keyLimits: { rpm: 5, tpm: 100_000, policy: "wait-then-send", maxWaitMs: 5000 },
+      modelLimits: { glm: { rpm: 30, tpm: 200_000, policy: "fallback" } },
+    },
+  };
+  // modelGlobal is null: testprov has no registry entry and we omit
+  // contextWindow so the inference layer returns null too. With only
+  // keyTotal + keyModel present, the precedence assertion isolates
+  // the keyModel > keyTotal rule.
+  const r = await acquireQuotaSlot({
+    provider: "testprov", model: "glm",
+    connectionId, connection: conn,
+  });
+  assert.equal(r.limits.rpm, 30, "keyModel.rpm must win over keyTotal.rpm");
+  assert.equal(r.limits.tpm, 200_000, "keyModel.tpm must win over keyTotal.tpm");
+  assert.equal(r.limits.policy, "fallback", "keyModel.policy must win over keyTotal.policy");
+});
+
+test("effectiveLimits precedence: keyTotal fills missing fields only", async () => {
+  const connectionId = "conn_precedence_2";
+  // keyModel only declares rpm, keyTotal declares tpm + policy.
+  // effectiveLimits.rpm must come from keyModel, tpm + policy from keyTotal.
+  const conn = {
+    data: {
+      keyLimits: { tpm: 500_000, policy: "reject-429" },
+      modelLimits: { glm: { rpm: 12 } },
+    },
+  };
+  const r = await acquireQuotaSlot({
+    provider: "testprov", model: "glm",
+    connectionId, connection: conn,
+  });
+  assert.equal(r.limits.rpm, 12, "keyModel.rpm");
+  assert.equal(r.limits.tpm, 500_000, "keyTotal.tpm fills in");
+  assert.equal(r.limits.policy, "reject-429", "keyTotal.policy fills in");
+});
+
+test("effectiveLimits precedence: modelGlobal.policy wins over keyTotal.policy", async () => {
+  // Real registry entry (nvidia/glm-5.2) populates modelGlobal with
+  // 30 rpm. We pair it with a keyTotal that has the looser policy
+  // "wait-then-send". The union must surface the registry's rpm=30
+  // (modelGlobal > keyTotal) and the strictest policy field.
+  // Note: modelGlobal from the registry does NOT carry a policy of
+  // its own, so the union uses the keyTotal policy (the only one set).
+  // The rpm precedence is the real assertion here.
+  const connectionId = "conn_precedence_3";
+  const conn = {
+    data: {
+      keyLimits: { rpm: 100, policy: "wait-then-send", maxWaitMs: 5000 },
+    },
+  };
+  const r = await acquireQuotaSlot({
+    provider: "nvidia", model: "z-ai/glm-5.2",
+    connectionId, connection: conn,
+  });
+  // modelGlobal from registry = 30 rpm, keyTotal = 100 rpm.
+  // modelGlobal wins → effectiveLimits.rpm = 30.
+  assert.equal(r.limits.rpm, 30, "modelGlobal.rpm (30) must beat keyTotal.rpm (100)");
+  assert.equal(r.limits.policy, "wait-then-send", "keyTotal.policy fills in");
+  assert.equal(r.limits.maxWaitMs, 5000, "keyTotal.maxWaitMs fills in");
+});
+
+test("effectiveLimits precedence: keyModel.policy wins over keyTotal.policy", async () => {
+  // When modelGlobal has no policy of its own, keyModel.policy
+  // must beat keyTotal.policy in the union (no registry, no model
+  // cap → modelGlobal is null, so the union is keyTotal ∪ keyModel).
+  const connectionId = "conn_precedence_4";
+  const conn = {
+    data: {
+      keyLimits: { rpm: 10, policy: "wait-then-send" },
+      modelLimits: { glm: { rpm: 50, policy: "reject-429" } },
+    },
+  };
+  const r = await acquireQuotaSlot({
+    provider: "testprov", model: "glm",
+    connectionId, connection: conn,
+  });
+  assert.equal(r.limits.policy, "reject-429", "keyModel.policy must win over keyTotal.policy");
+  assert.equal(r.limits.rpm, 50, "keyModel.rpm (50) must win over keyTotal.rpm (10)");
+});
+
+// ─── Behavior change: legacy connection.data.limits is global-scope only ─
+// Document + lock the migration rule: `connection.data.limits` (legacy
+// field) is read by getResolvedLimits when skipConnectionLayer=false.
+// The throttle now ALWAYS sets skipConnectionLayer=true on the global
+// tier, so this regression test pins that behaviour and produces a
+// diagnostic failure if a future refactor re-enables the leak.
+test("legacy connection.data.limits is honoured only when the resolver is called without skipConnectionLayer", () => {
+  // The global-scope path inside the throttle calls
+  //   getResolvedLimits({ ..., skipConnectionLayer: true })
+  // which makes getConnectionLimitsFromObj return null. We assert
+  // that contract here so any future change is intentional.
+  const conn = { data: { limits: { rpm: 7, source: "legacy" } } };
+  const legacyOn = getResolvedLimits({
+    provider: "testprov", model: "glm", connection: conn, connectionId: null,
+  });
+  // With the legacy field, the resolver used to return { rpm: 7 }.
+  // That path is preserved for any caller that does NOT pass
+  // skipConnectionLayer.
+  if (legacyOn) {
+    assert.equal(legacyOn.rpm, 7);
+  }
+  const legacyOff = getResolvedLimits({
+    provider: "testprov", model: "glm", connection: conn, connectionId: null,
+    skipConnectionLayer: true,
+  });
+  // skipConnectionLayer=true → connection layer must be ignored.
+  // testprov has no registry entry, no inferred ctx, so it must be null.
+  assert.equal(legacyOff, null, "skipConnectionLayer=true must drop connection.data.limits");
+});

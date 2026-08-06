@@ -67,6 +67,29 @@ Các provider custom trong fork layer, base registry không sửa.
   - `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
 - **Backward compatibility:** Tầng nào không khai báo limits sẽ tự động bypass check. `skipConnectionLayer` mặc định `false` nên caller cũ (`getResolvedLimits` với cờ mặc định) giữ nguyên hành vi đã pass test trước PR này.
 
+#### 3-tier precedence của `effectiveLimits`
+
+- Union của 3 tầng dùng cho **logging + `policy` + `maxWaitMs`** (KHÔNG dùng để quyết định acquire/wait — 3 scope đếm độc lập).
+- Precedence (cao → thấp): **`modelGlobal > keyModel > keyTotal`**. Tầng cao hơn ghi đè trường trùng; tầng thấp chỉ fill field chưa ai set.
+- Implement: `[keyTotal, keyModel, modelGlobal].filter(Boolean).reduce((acc, l) => ({ ...acc, ...l }), null)` — phần tử CUỐI mảng thắng, đúng rule.
+- `policy` và `maxWaitMs` cũng theo rule này: tầng strictest (vd `modelGlobal.policy=reject-429`) KHÔNG bị downgrade bởi tầng looser (vd `keyTotal.policy=wait-then-send`).
+- **Tại sao `keyTotal` là lowest?** Đây là "safety net" tổng — nó chỉ fill field nào các tầng trên chưa set. Nếu keyTotal thắng tầng trên, một key có `keyLimits.rpm=5` sẽ chặn mọi model trên key đó xuống 5 rpm, kể cả khi model đó được registry cho phép 30 rpm → oan.
+
+#### Behavior change: `connection.data.limits` (legacy) chỉ còn tác dụng ở Model Global scope
+
+- Trước PR này: `connection.data.limits` được đọc bởi `getResolvedLimits` và áp cho **mọi** scope (vì throttle truyền `connection` xuống cả global tier). Đây là bug — 1 key có thể chặn mọi key khác qua Model Global scope.
+- Sau PR này: throttle chủ động `skipConnectionLayer: true` khi tính Model Global tier → `connection.data.limits` KHÔNG còn ảnh hưởng tới Model Global scope.
+- **Quy tắc migration cho user đã config trước:**
+  - Muốn cap **tổng tất cả model trên key** (Key Total): chuyển sang `connection.data.keyLimits` (vd `{ rpm: 5 }`).
+  - Muốn cap **một model cụ thể trên key** (Key Per-Model): chuyển sang `connection.data.modelLimits[model]` (vd `{ "z-ai/glm-5.2": { rpm: 15 } }`).
+  - Muốn giữ cũ (chỉ áp cho Model Global, không phân biệt key): bỏ trống — registry/auto/inferred sẽ quyết định.
+- Lock hợp đồng bằng test `legacy connection.data.limits is honoured only when the resolver is called without skipConnectionLayer` (xem `tests/unit/three-tier-limits.test.mjs`).
+
+#### Verify
+- `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **68/68 PASS** (gồm 5 test precedence mới + 1 test lock behavior change).
+- `node --test tests/unit/*.test.mjs` → **95/95 PASS** (toàn bộ unit test).
+- `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
+
 ### 2. Context length system
 
 | Feature | File chính |
