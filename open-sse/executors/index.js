@@ -22,7 +22,6 @@ import { MimoFreeExecutor } from "./mimo-free.js";
 import { CodeBuddyExecutor } from "./codebuddy-cn.js";
 import { isDiepXuanEnabled } from "../../src/diepxuan/shared/config/flags.js";
 // diepxuan fork-layer executors
-import DiepxuanMimoFreeExecutor from "../diepxuan/executors/mimo-free.js";
 import DiepxuanGroqExecutor from "../diepxuan/executors/groq.js";
 import { DiepxuanDefaultExecutor } from "../diepxuan/executors/default.js";
 import { DefaultExecutor } from "./default.js";
@@ -53,8 +52,8 @@ const executors = {
   commandcode: new CommandCodeExecutor(),
   "xiaomi-tokenplan": new XiaomiTokenplanExecutor(),
   "groq": new (isDiepXuanEnabled() ? DiepxuanGroqExecutor : DefaultExecutor)(),
-  "mimo-free": new (isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor)(),
-  mmf: new (isDiepXuanEnabled() ? DiepxuanMimoFreeExecutor : MimoFreeExecutor)(), // Alias for mimo-free
+  "mimo-free": new MimoFreeExecutor(),
+  mmf: new MimoFreeExecutor(), // Alias for mimo-free
   "codebuddy-cn": new CodeBuddyExecutor(),
 };
 

@@ -540,7 +540,6 @@
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/translator/index.js",
-        "open-sse/diepxuan/executors/mimo-free.js",
         "open-sse/executors/index.js",
         "open-sse/utils/error.js",
         "open-sse/handlers/chatCore.js",
@@ -567,22 +566,6 @@
         {
           "file": "open-sse/translator/index.js",
           "pattern": "stripBuiltinTools"
-        },
-        {
-          "file": "open-sse/diepxuan/executors/mimo-free.js",
-          "pattern": "DiepxuanMimoFreeExecutor"
-        },
-        {
-          "file": "open-sse/diepxuan/executors/mimo-free.js",
-          "pattern": "parseMimoFreeError"
-        },
-        {
-          "file": "open-sse/executors/index.js",
-          "pattern": "DiepxuanMimoFreeExecutor"
-        },
-        {
-          "file": "open-sse/executors/index.js",
-          "pattern": "isDiepXuanEnabled\\(\\) \\? DiepxuanMimoFreeExecutor : MimoFreeExecutor"
         },
         {
           "file": "open-sse/utils/error.js",
@@ -614,7 +597,6 @@
         "open-sse/diepxuan/registry/minimax.js",
         "open-sse/diepxuan/registry/minimax-cn.js",
         "open-sse/translator/index.js",
-        "open-sse/diepxuan/executors/mimo-free.js",
         "open-sse/executors/index.js",
         "open-sse/utils/error.js",
         "open-sse/handlers/chatCore.js"
