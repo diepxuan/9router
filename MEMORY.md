@@ -75,6 +75,7 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 
 | Ngày | Sự kiện |
 |------|---------|
+| 2026-08-06 | PR #68 merged (squash `5f25a49`): re-scoped combo-only; dropped ADR-007 rate-limit engine (throttle/auto-discovery/api/ui/registry declarations) |
 | 2026-07-31 | Context length system: API /api/models/context-lengths, combo ctx skip, ctx badges combo + provider UI, source priority api > static > error, NVIDIA 48 free models |
 | 2026-07-30 | Commit series trên basemain: governance, CI/CD, Enhanced Console Log, CLI baseUrl, provider expansion, web combo fallback, response model override, rate-limit engine + wire, sharedDb, context length |
 | 2026-07-25 | PR #58: REMOVED wrong wrapToolsForMinimax + dropThinking quirk. Root cause analysis: MiniMax Claude endpoint expects Anthropic-shape tools, not OpenAI-shape. MiniMax docs confirm thinking IS supported. Kept stripBuiltinTools + all other correct fixes. |
