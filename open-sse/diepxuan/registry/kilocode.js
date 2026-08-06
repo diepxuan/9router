@@ -11,6 +11,10 @@
 //
 // Wired via d12 in open-sse/providers/registry/index.js, appended after the
 // base entry so the last entry with id="kilocode" wins.
+//
+// Note: rate-limit `limits` declaration (KILO_FREE_TIER_LIMITS) was removed
+// in PR #68 re-scope; the throttle engine no longer exists. See MEMORY.md
+// §4 nợ kỹ thuật.
 
 import baseKilocode from "../../providers/registry/kilocode.js";
 import { isDiepXuanEnabled } from "../../../src/diepxuan/shared/config/flags.js";
@@ -40,19 +44,9 @@ for (const model of FREE_HOSTED_MODELS) {
   }
 }
 
-// Free hosted models on Kilo Gateway are capped at 200 requests/hour
-// (per Sếp directive 2026-08-05). rpm ~4 keeps bursts under the hourly cap;
-// the throttle treats rph as authoritative.
-const KILO_FREE_TIER_LIMITS = {
-  rph: 200,
-  rpm: 4,
-  source: "kilo-gateway free tier 200 rph",
-};
-
 const override = {
   ...baseKilocode,
   hasFree: true,
-  limits: KILO_FREE_TIER_LIMITS,
   models: mergedModels,
   display: {
     ...baseKilocode.display,

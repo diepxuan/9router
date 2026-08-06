@@ -11,215 +11,6 @@
   },
   "features": [
     {
-      "id": "rate-limit-engine",
-      "description": "Rate-limit engine (ADR-007): metadata resolution, auto-discovery t\u1eeb 429, throttle sliding window, combo fail tracker + skip, wire v\u00e0o core proxy.",
-      "requiredFiles": [
-        "open-sse/services/combo.js",
-        "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/comboFailTracker.js",
-        "src/app/api/settings/route.js",
-        "tests/unit/combo-immediate-fallback-node.test.mjs",
-        "open-sse/diepxuan/limits/autoDiscoverHook.js",
-        "open-sse/diepxuan/limits/autoDiscovery.js",
-        "open-sse/handlers/chatCore.js",
-        "tests/unit/limits-auto-discovery.test.mjs",
-        "open-sse/diepxuan/limits/index.js",
-        "open-sse/diepxuan/limits/errorParser.js",
-        "open-sse/diepxuan/limits/inference.js",
-        "open-sse/diepxuan/limits/README.md",
-        "tests/unit/limits-resolution.test.mjs",
-        "open-sse/diepxuan/limits/cache.js",
-        "open-sse/diepxuan/limits/window.js",
-        "open-sse/diepxuan/limits/throttle.js",
-        "src/sse/handlers/chat.js",
-        "tests/unit/limits-throttle.test.mjs",
-        "open-sse/services/accountFallback.js",
-        "open-sse/utils/error.js",
-        "src/app/api/models/limits/route.js",
-        "src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx",
-        "src/app/api/v1/models/route.js",
-        "tests/unit/models-limits-api.test.mjs",
-        "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js",
-        "src/app/(dashboard)/dashboard/providers/[id]/page.js"
-      ],
-      "requiredPatterns": [
-        {
-          "file": "open-sse/services/combo.js",
-          "pattern": "beforeComboModelAttempt"
-        },
-        {
-          "file": "open-sse/services/combo.js",
-          "pattern": "afterComboModelAttempt"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "shouldSkipComboModel"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "recordComboModelOutcome"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "beforeComboModelAttempt"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "afterComboModelAttempt"
-        },
-        {
-          "file": "open-sse/diepxuan/comboFailTracker.js",
-          "pattern": "MAX_FAILS"
-        },
-        {
-          "file": "src/app/api/settings/route.js",
-          "pattern": "resetComboFailTracker"
-        },
-        {
-          "file": "tests/unit/combo-immediate-fallback-node.test.mjs",
-          "pattern": "combo fallback immediately tries next model"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
-          "pattern": "maybeRecordLimitsFromUpstreamError"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/autoDiscoverHook.js",
-          "pattern": "extractLimitsFromError"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
-          "pattern": "initAutoDiscoveredLimitsTable"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
-          "pattern": "CREATE TABLE IF NOT EXISTS"
-        },
-        {
-          "file": "open-sse/handlers/chatCore.js",
-          "pattern": "maybeRecordLimitsFromUpstreamError"
-        },
-        {
-          "file": "open-sse/handlers/chatCore.js",
-          "pattern": "diepxuan/limits/autoDiscoverHook"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getResolvedLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "mergeLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getProviderLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getModelLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/autoDiscovery.js",
-          "pattern": "getAutoDiscoveredLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/errorParser.js",
-          "pattern": "extractLimitsFromError"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/inference.js",
-          "pattern": "inferLimitsFromContext"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/cache.js",
-          "pattern": "initRateLimitCountersTable"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/cache.js",
-          "pattern": "readPrunedEvents"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/cache.js",
-          "pattern": "pushEvent"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/window.js",
-          "pattern": "oldestAgeOutAt"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/window.js",
-          "pattern": "projectedAgeOutAt"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/throttle.js",
-          "pattern": "acquireQuotaSlot"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/throttle.js",
-          "pattern": "recordRequestOutcome"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/throttle.js",
-          "pattern": "estimateTokens"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "acquireQuotaSlot"
-        },
-        {
-          "file": "open-sse/diepxuan/comboHooks.js",
-          "pattern": "async function beforeComboModelAttempt"
-        },
-        {
-          "file": "open-sse/services/combo.js",
-          "pattern": "await beforeComboModelAttempt"
-        },
-        {
-          "file": "open-sse/services/combo.js",
-          "pattern": "wrapped"
-        },
-        {
-          "file": "src/sse/handlers/chat.js",
-          "pattern": "connectionId: credentials.connectionId"
-        },
-        {
-          "file": "src/app/api/models/limits/route.js",
-          "pattern": "getResolvedLimits"
-        },
-        {
-          "file": "src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx",
-          "pattern": "ModelLimitBadge"
-        },
-        {
-          "file": "src/app/api/v1/models/route.js",
-          "pattern": "model.limits"
-        }
-      ],
-      "syntaxCheck": [
-        "open-sse/services/combo.js",
-        "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/comboFailTracker.js",
-        "src/app/api/settings/route.js",
-        "tests/unit/combo-immediate-fallback-node.test.mjs",
-        "open-sse/diepxuan/limits/autoDiscoverHook.js",
-        "open-sse/handlers/chatCore.js",
-        "tests/unit/limits-auto-discovery.test.mjs",
-        "open-sse/diepxuan/limits/index.js",
-        "open-sse/diepxuan/limits/autoDiscovery.js",
-        "open-sse/diepxuan/limits/errorParser.js",
-        "open-sse/diepxuan/limits/inference.js",
-        "tests/unit/limits-resolution.test.mjs",
-        "open-sse/diepxuan/limits/cache.js",
-        "open-sse/diepxuan/limits/window.js",
-        "open-sse/diepxuan/limits/throttle.js",
-        "src/sse/handlers/chat.js",
-        "tests/unit/limits-throttle.test.mjs",
-        "open-sse/services/accountFallback.js",
-        "open-sse/utils/error.js"
-      ]
-    },
-    {
       "id": "ui-dashboard",
       "description": "UI/Dashboard: Enhanced Console Log, CLI tools current-origin, Codex subagent, combo curl baseUrl, DonateModal removal, i18n vi, combo list A-Z.",
       "requiredFiles": [
@@ -341,7 +132,7 @@
     },
     {
       "id": "web-tool-combo-fallback",
-      "description": "Web search/fetch combo fallback khi kh\u00f4ng c\u00f3 provider input.",
+      "description": "Web search/fetch combo fallback khi không có provider input.",
       "requiredFiles": [
         "src/sse/handlers/search.js",
         "src/sse/handlers/fetch.js",
@@ -642,7 +433,6 @@
         "src/app/api/v1/models/route.js",
         "open-sse/services/accountFallback.js",
         "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/limits/throttle.js",
         "src/app/api/models/context-lengths/route.js",
         "src/app/(dashboard)/dashboard/combos/page.js",
         "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
@@ -733,7 +523,6 @@
         "open-sse/diepxuan/contextLength/errorParser.js",
         "src/app/api/v1/models/route.js",
         "open-sse/diepxuan/comboHooks.js",
-        "open-sse/diepxuan/limits/throttle.js",
         "src/app/api/models/context-lengths/route.js",
         "src/app/(dashboard)/dashboard/combos/page.js",
         "src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js",
@@ -788,10 +577,6 @@
           "pattern": "parseMimoFreeError"
         },
         {
-          "file": "open-sse/diepxuan/executors/mimo-free.js",
-          "pattern": "MIMO_RATE_LIMIT_CODES"
-        },
-        {
           "file": "open-sse/executors/index.js",
           "pattern": "DiepxuanMimoFreeExecutor"
         },
@@ -837,7 +622,7 @@
     },
     {
       "id": "combo-response-model-override",
-      "description": "Combo response model override ch\u1ed1ng leak internal model name cho Codex CLI.",
+      "description": "Combo response model override chống leak internal model name cho Codex CLI.",
       "requiredFiles": [
         "open-sse/diepxuan/transformers/responseModelOverride.js",
         "open-sse/handlers/chatCore.js",
@@ -968,42 +753,6 @@
         {
           "file": "open-sse/diepxuan/registry/gemini.js",
           "pattern": "gemma-4-26b-a4b-it"
-        },
-        {
-          "file": "open-sse/diepxuan/registry/nvidia.js",
-          "pattern": "NVIDIA_FREE_TIER_LIMITS"
-        },
-        {
-          "file": "open-sse/diepxuan/registry/nvidia.js",
-          "pattern": "MODEL_LIMIT_OVERRIDES"
-        },
-        {
-          "file": "open-sse/diepxuan/registry/kilocode.js",
-          "pattern": "KILO_FREE_TIER_LIMITS"
-        },
-        {
-          "file": "tests/unit/limits-resolution.test.mjs",
-          "pattern": "getProviderLimits reads NVIDIA free tier limits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getResolvedKeyTotalLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getResolvedKeyModelLimits"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/throttle.js",
-          "pattern": "buildKeyTotalScope"
-        },
-        {
-          "file": "open-sse/diepxuan/limits/index.js",
-          "pattern": "getResolvedKeyTotalLimits"
-        },
-        {
-          "file": "tests/unit/three-tier-limits.test.mjs",
-          "pattern": "Key Total Limit blocks OTHER models on same key"
         }
       ],
       "syntaxCheck": [
@@ -1120,5 +869,5 @@
       ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18; 2026-07-28 added limit-metadata-resolution (PR #59 of ADR-007) -> 21 features (added limit-throttle-engine #61) (limit-metadata-resolution #59 + limit-auto-discovery #60)."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18. PR #68 (2026-08-06) dropped rate-limit-engine (ADR-007) -> 17 features."
 }

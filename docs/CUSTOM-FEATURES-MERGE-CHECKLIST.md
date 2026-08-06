@@ -28,7 +28,6 @@ Các provider custom trong fork layer, base registry không sửa.
 | Groq expansion + capabilities | `open-sse/diepxuan/registry/groq.js`, `open-sse/providers/capabilities.js` |
 | Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
 | NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
-| NVIDIA + Kilo Code rate limits (provider/override tiers) | `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs` |
 | OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
 | LLMGateway free/cheap gateway | `open-sse/diepxuan/registry/llmgateway.js`, `open-sse/providers/registry/index.js` |
 | Kilo Code free hosted models | `open-sse/diepxuan/registry/kilocode.js`, `open-sse/providers/registry/index.js` |
@@ -37,76 +36,6 @@ Các provider custom trong fork layer, base registry không sửa.
 | Wire vào registry | `open-sse/providers/registry/index.js` |
 
 `src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` là base file; chỉ thêm import + render badge từ fork layer (`ModelFreeBadge.jsx`) để hiển thị model free.
-
-### 2026-08-05 — Rate-limit registry overrides + resolver fix
-
-- **Feature:** Khai báo `limits` trong NVIDIA registry (provider-level 40 rpm / 1M tpm / concurrency 5 + model override `z-ai/glm-5.2` = 30 rpm, 500k tpm) và Kilo Code (provider-level 200 rph / 4 rpm).
-- **Bug fix:** `open-sse/diepxuan/limits/index.js findRegistryEntry` trả entry đầu tiên thay vì entry cuối, khiến fork overrides (ví dụ limits NVIDIA/Kilo) bị base entry (id trùng) shadow. Đã sửa lấy **last match** đúng semantics "last wins".
-- **File đổi:** `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs`.
-- **Smoke test:** `node --test tests/unit/limits-resolution.test.mjs` pass 26/26.
-
-### 2026-08-06 — 3-Tier Rate Limits Enforcement (Key Total + Key Per-Model + Model Global)
-
-- **Feature:** Nâng cấp hệ thống rate limits từ 1 tầng per-model sang **3 tầng độc lập**:
-  1. **Key Total (`keyLimits`)**: Tổng tất cả model dùng chung 1 key/connection (scope `conn:<id>:<provider>/*`).
-  2. **Key Per-Model (`modelLimitsPerKey` / `connection.modelLimits[model]`)**: Giới hạn của 1 key khi dùng cho 1 model cụ thể (scope `conn:<id>:<provider>/<model>`).
-  3. **Model Global (`modelLimits` / `provider.limits` / `auto` / `inferred`)**: Giới hạn chung của model đó toàn hệ thống (scope `global:<provider>/<model>`).
-- **Bug fix đính kèm (2026-08-06):**
-  1. `getResolvedLimits` giờ nhận `skipConnectionLayer`. Throttle chủ động bật cờ này khi tính Model Global để `connection.limits` (per-key) KHÔNG rò vào scope global — nếu không, 1 key có thể chặn mọi key khác dùng cùng model.
-  2. `getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chấp nhận cả hai dạng: `connection.data` là JSON-string (raw row) lẫn object đã được `connectionsRepo.getProviderConnectionById` trải phẳng. Trước đó chỉ nhận raw row, nên `loadConnectionById` thực tế không áp được per-key limits.
-  3. Dọn dead code (đoạn unreachable sau khi tái cấu trúc) trong `acquireQuotaSlot`.
-- **File đổi:**
-  - `open-sse/diepxuan/limits/index.js` — `getResolvedKeyTotalLimits`, `getResolvedKeyModelLimits`, helper `readConnectionData`, `skipConnectionLayer`.
-  - `open-sse/diepxuan/limits/throttle.js` — `loadConnectionById`, 3 scope builders, `effectiveLimits = union(tiers)`, `skipConnectionLayer: true` cho global tier.
-  - `tests/unit/three-tier-limits.test.mjs` — 10 test (resolver + 3-tier throttle + comboHooks integration + 2 hồi quy).
-  - `tests/unit/models-limits-api.test.mjs` — cập nhật kỳ vọng sau khi fork registry bổ sung NVIDIA free-tier (PR #64).
-  - `docs/custom-features.manifest.json` — pattern cho 3-tier rate limits + bỏ pattern cũ đã obsolete.
-- **Smoke test:**
-  - `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **63/63 PASS**.
-  - `node --test tests/unit/*.test.mjs` → **90/90 PASS** (toàn bộ unit test).
-  - `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
-- **Backward compatibility:** Tầng nào không khai báo limits sẽ tự động bypass check. `skipConnectionLayer` mặc định `false` nên caller cũ (`getResolvedLimits` với cờ mặc định) giữ nguyên hành vi đã pass test trước PR này.
-
-#### 3-tier precedence của `effectiveLimits`
-
-- Union của 3 tầng dùng cho **logging + `policy` + `maxWaitMs`** (KHÔNG dùng để quyết định acquire/wait — 3 scope đếm độc lập).
-- Precedence (cao → thấp): **`modelGlobal > keyModel > keyTotal`**. Tầng cao hơn ghi đè trường trùng; tầng thấp chỉ fill field chưa ai set.
-- Implement: `[keyTotal, keyModel, modelGlobal].filter(Boolean).reduce((acc, l) => ({ ...acc, ...l }), null)` — phần tử CUỐI mảng thắng, đúng rule.
-- **Known follow-up:** field `concurrency` hiện được merge vào `effectiveLimits` cho logging / dashboard nhưng throttle CHƯA enforce semaphore per-process. Tracking issue: bổ sung semaphore ở PR tiếp theo.
-- `policy` và `maxWaitMs` cũng theo rule này: tầng strictest (vd `modelGlobal.policy=reject-429`) KHÔNG bị downgrade bởi tầng looser (vd `keyTotal.policy=wait-then-send`).
-- **Tại sao `keyTotal` là lowest?** Đây là "safety net" tổng — nó chỉ fill field nào các tầng trên chưa set. Nếu keyTotal thắng tầng trên, một key có `keyLimits.rpm=5` sẽ chặn mọi model trên key đó xuống 5 rpm, kể cả khi model đó được registry cho phép 30 rpm → oan.
-
-#### Behavior change: `connection.data.limits` (legacy) chỉ còn tác dụng ở Model Global scope
-
-- Trước PR này: `connection.data.limits` được đọc bởi `getResolvedLimits` và áp cho **mọi** scope (vì throttle truyền `connection` xuống cả global tier). Đây là bug — 1 key có thể chặn mọi key khác qua Model Global scope.
-- Sau PR này: throttle chủ động `skipConnectionLayer: true` khi tính Model Global tier → `connection.data.limits` KHÔNG còn ảnh hưởng tới Model Global scope.
-- **Quy tắc migration cho user đã config trước:**
-  - Muốn cap **tổng tất cả model trên key** (Key Total): chuyển sang `connection.data.keyLimits` (vd `{ rpm: 5 }`).
-  - Muốn cap **một model cụ thể trên key** (Key Per-Model): chuyển sang `connection.data.modelLimits[model]` (vd `{ "z-ai/glm-5.2": { rpm: 15 } }`).
-  - Muốn giữ cũ (chỉ áp cho Model Global, không phân biệt key): bỏ trống — registry/auto/inferred sẽ quyết định.
-- Lock hợp đồng bằng test `legacy connection.data.limits is honoured only when the resolver is called without skipConnectionLayer` (xem `tests/unit/three-tier-limits.test.mjs`).
-
-#### Bug fixed in this PR follow-up (key-limits shape compat + auto-discovery wiring)
-
-Hai bug runtime phát hiện sau khi 3-tier commit đầu tiên (6405ff88 → fde7a0a2 → 7a3daffb) đã được sửa thành commit tiếp theo trong cùng nhánh PR #68:
-
-1. **`getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chỉ đọc `connection.data.{keyLimits,modelLimits}`** (helper mới chỉ nhận raw row). Trong khi đó `connectionsRepo.getProviderConnectionById` trả về hình dạng `rowToConn` — JSON blob được spread lên top-level: `{ id, provider, keyLimits, modelLimits, ... }` KHÔNG có `data` wrapper. Hệ quả: per-key limits không bao giờ được áp ở production vì throttle lazy-load đúng hình dạng top-level.
-   - **Fix:** thêm 2 helper nội bộ `readKeyLimitsFromConnectionObj` / `readKeyModelLimitsFromConnectionObj` chấp nhận cả top-level và `data` wrapper; `getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chuyển sang dùng helper này. Tương tự với `getConnectionLimitsFromObj` cho legacy `connection.limits`.
-   - **Lock:** test `getResolvedKeyTotalLimits reads top-level keyLimits (rowToConn shape)` + `getKeyModelLimitsFromConnectionObj reads top-level modelLimits (rowToConn shape)` + `getResolvedKeyModelLimits merges top-level modelLimits over registry` + `acquireQuotaSlot applies key_total limits from a top-level-shaped connection (runtime repro)`.
-
-2. **`getAutoDiscoveredLimits` ở Model Global tier bị bỏ sót vì throttle truyền `connectionId=null`.** `getAutoDiscoveredLimits` short-circuits to `null` khi thiếu `connectionId`; throttle gọi `getResolvedLimits` cho Model Global mà KHÔNG truyền `connectionId` → auto-discovered limits (học từ 429 trước) trở thành dead code.
-   - **Fix:** throttle truyền `connectionId` cho `getResolvedLimits` ở Model Global tier.
-   - **Lock:** test `Model Global tier applies auto-discovered limits when connectionId is forwarded` — ghi row trực tiếp vào `auto_discovered_limits_diepxuan` rồi assert `acquireQuotaSlot` block với `model_global_rpm_exceeded`.
-
-**Bài học cho agent/session sau:**
-- `connectionsRepo.getProviderConnectionById` LUÔN trả về JSON blob đã spread lên top-level. Bất kỳ helper nào đọc `data.{key,model,limits}` cần check cả top-level.
-- Bất kỳ code nào gọi `getAutoDiscoveredLimits` / `getResolvedLimits` đều phải forward `connectionId`, kể cả khi compute Model Global tier (vì tier này vẫn cần auto-discovery lookup).
-
-
-#### Verify
-- `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **74/74 PASS** (gồm 5 test precedence + 1 test lock behavior change + 4 test hồi quy top-level + 1 test auto-discovery + 3 test edge-case từ d0d00cc4).
-- `node --test tests/unit/*.test.mjs` → **101/101 PASS** (toàn bộ unit test; +6 test hồi quy cho 2 bug trên).
-- `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
 
 ### 2. Context length system
 
@@ -119,19 +48,6 @@ Hai bug runtime phát hiện sau khi 3-tier commit đầu tiên (6405ff88 → fd
 | UI ctx badges (combo + provider) | `combos/page.js`, `combo/[id]/page.js`, `providers/[id]/ModelRow.js` |
 | Source priority api > static > error | `contextLength/cache.js` |
 | Đọc ưu tiên static > error | `contextLength/index.js` (`getContextLengthSync`, batch) |
-
-### 3. Rate-limit engine (ADR-007)
-
-| Feature | File chính |
-|---|---|
-| Metadata resolution | `open-sse/diepxuan/limits/index.js` |
-| Auto-discovery từ 429 | `limits/autoDiscovery.js`, `autoDiscoverHook.js`, `errorParser.js` |
-| Throttle sliding window | `limits/throttle.js`, `cache.js`, `window.js` |
-| Combo fail tracker + skip | `open-sse/diepxuan/comboHooks.js`, `comboFailTracker.js`, `services/combo.js` |
-| Wire vào core | `handlers/chatCore.js`, `utils/error.js`, `services/accountFallback.js` |
-| Limits API | `src/app/api/models/limits/route.js` |
-| Limits badge UI | `src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx`, `providers/[id]/ModelRow.js`, `page.js` |
-| `/v1/models` limits enrichment | `src/app/api/v1/models/route.js` |
 
 ### 4. Fork transformers & executors
 
@@ -185,7 +101,6 @@ Cả hai PASS mới push.
 
 - `tests/unit/stripCodexModelMarkers.test.mjs` — strip `[` marker trong text + body messages
 - `tests/unit/context-length-priority.test.mjs` — static 1M thắng error 256K
-- `tests/unit/models-limits-api.test.mjs` — resolved limits + inferred source
 
 Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 
@@ -193,7 +108,6 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 
 - Proxy: `curl http://localhost:3000/api/health`
 - Combo: mở `/dashboard/combos`, kiểm tra ctx badge + fallback
-- Rate limit: gửi request vượt RPM, kiểm tra throttle/fallback
 - Console log: mở `/dashboard/console-log`
 - `/v1/models`: kiểm tra `context_length` có giá trị
 

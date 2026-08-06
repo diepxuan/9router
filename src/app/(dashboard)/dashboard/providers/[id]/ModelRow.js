@@ -1,6 +1,5 @@
 import PropTypes from "prop-types";
 import { CapacityBadges } from "@/shared/components";
-import ModelLimitBadge from "@/diepxuan/app/dashboard/providers/ModelLimitBadge";
 import ModelFreeBadge from "@/diepxuan/app/dashboard/providers/ModelFreeBadge";
 
 function formatCtx(n) {
@@ -10,7 +9,7 @@ function formatCtx(n) {
   return `${n}`;
 }
 
-export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps, contextLength, limits, thinkingSuffix }) {
+export default function ModelRow({ model, fullModel, alias, copied, onCopy, testStatus, isCustom, isFree, onDeleteAlias, onTest, isTesting, onDisable, caps, contextLength, thinkingSuffix }) {
   const displayModel = thinkingSuffix ? `${fullModel}(${thinkingSuffix})` : fullModel;
   const borderColor = testStatus === "ok"
     ? "border-green-500/40"
@@ -39,7 +38,6 @@ export default function ModelRow({ model, fullModel, alias, copied, onCopy, test
             {model.name && <span className="truncate text-[9px] italic text-text-muted/70">{model.name}</span>}
             <CapacityBadges caps={caps} colorOverride="text-text-muted/70" size={12} />
             {formatCtx(contextLength || caps?.contextWindow) ? <span className="truncate text-[9px] text-text-muted/70">{formatCtx(contextLength || caps?.contextWindow)}</span> : null}
-            <ModelLimitBadge limits={limits} />
           </span>
         </div>
         {onTest && (
@@ -111,6 +109,5 @@ ModelRow.propTypes = {
   onDisable: PropTypes.func,
   caps: PropTypes.object,
   contextLength: PropTypes.number,
-  limits: PropTypes.object,
   thinkingSuffix: PropTypes.string,
 };
