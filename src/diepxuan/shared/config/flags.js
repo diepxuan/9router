@@ -16,7 +16,11 @@ export function isDiepXuanEnabled() {
 // Conservative mode: only allow DiepXuan hooks that are considered safe
 // (read-only helpers, no DB writes, no provider override). Other hooks should
 // fall back to the base behaviour.
+export function isDiepXuanSafeMode() {
+  return parseBool(process.env.DIEPXUAN_SAFE_MODE, false);
+}
 
 export const DIE_PXUAN_FLAGS = {
   isDiepXuanEnabled,
+  isDiepXuanSafeMode,
 };
