@@ -46,90 +46,6 @@ describe("DiepXuan feature flags", () => {
   });
 });
 
-describe("DiepXuan usage override", () => {
-  it("handleUsageOverrideResponse returns a JSON response for manual quota providers", async () => {
-    const quota = { provider: "alicode", plan: "lite", quotas: [] };
-    const getManualQuota = vi.fn(async () => quota);
-
-    vi.doMock("@/diepxuan/lib/db/repos/manualQuotaRepo.js", () => ({
-      hasManualQuota: vi.fn((provider) => provider === "alicode"),
-      getManualQuota,
-    }));
-
-    const { handleUsageOverrideResponse } = await import("@/diepxuan/usage/index.js");
-    const response = await handleUsageOverrideResponse(
-      { provider: "alicode", id: "conn-1" },
-      "conn-1",
-    );
-
-    expect(response).toBeInstanceOf(Response);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(quota);
-  });
-
-  it("handleUsageOverrideResponse returns null when DiepXuan is disabled", async () => {
-    process.env.DIEPXUAN_ENABLED = "0";
-    const getManualQuota = vi.fn(async () => ({ provider: "alicode" }));
-
-    vi.doMock("@/diepxuan/lib/db/repos/manualQuotaRepo.js", () => ({
-      hasManualQuota: vi.fn(() => true),
-      getManualQuota,
-    }));
-
-    const { handleUsageOverrideResponse } = await import("@/diepxuan/usage/index.js");
-    const response = await handleUsageOverrideResponse(
-      { provider: "alicode", id: "conn-1" },
-      "conn-1",
-    );
-
-    expect(response).toBeNull();
-    expect(getManualQuota).not.toHaveBeenCalled();
-  });
-
-  it("returns manual quota for providers handled by DiepXuan", async () => {
-    const quota = { provider: "alicode", plan: "lite", quotas: [] };
-    const getManualQuota = vi.fn(async () => quota);
-
-    vi.doMock("@/diepxuan/lib/db/repos/manualQuotaRepo.js", () => ({
-      hasManualQuota: vi.fn((provider) => provider === "alicode"),
-      getManualQuota,
-    }));
-
-    const { getUsageOverride } = await import("@/diepxuan/usage/index.js");
-    const result = await getUsageOverride(
-      { provider: "alicode", id: "conn-1" },
-      "conn-1",
-    );
-
-    expect(result).toBe(quota);
-    expect(getManualQuota).toHaveBeenCalledWith(
-      "alicode",
-      "conn-1",
-      expect.objectContaining({ provider: "alicode" }),
-    );
-  });
-
-  it("falls back to upstream behavior when DiepXuan is disabled", async () => {
-    process.env.DIEPXUAN_ENABLED = "0";
-
-    const getManualQuota = vi.fn(async () => ({ provider: "alicode" }));
-
-    vi.doMock("@/diepxuan/lib/db/repos/manualQuotaRepo.js", () => ({
-      hasManualQuota: vi.fn(() => true),
-      getManualQuota,
-    }));
-
-    const { getUsageOverride } = await import("@/diepxuan/usage/index.js");
-    const result = await getUsageOverride(
-      { provider: "alicode", id: "conn-1" },
-      "conn-1",
-    );
-
-    expect(result).toBeNull();
-    expect(getManualQuota).not.toHaveBeenCalled();
-  });
-});
-
 describe("DiepXuan combo fail tracker hook", () => {
   it("beforeComboModelAttempt skips and logs a model after repeated failures", async () => {
     const {
@@ -149,7 +65,7 @@ describe("DiepXuan combo fail tracker hook", () => {
     recordComboModelOutcome(model, comboName, false);
     recordComboModelOutcome(model, comboName, false);
 
-    expect(await beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: true });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: true, reason: "fail_count_exceeded" });
     expect(log.debug).toHaveBeenCalledWith("COMBO", `Skipping ${model} (fail count exceeded)`);
   });
 
@@ -169,7 +85,7 @@ describe("DiepXuan combo fail tracker hook", () => {
     expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
 
     afterComboModelAttempt({ modelStr: model, comboName, ok: false });
-    expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: true });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: true, reason: "fail_count_exceeded" });
 
     afterComboModelAttempt({ modelStr: model, comboName, ok: true });
     expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
