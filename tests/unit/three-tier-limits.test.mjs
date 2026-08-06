@@ -131,10 +131,13 @@ test("Model Global resolver: skipConnectionLayer=true ignores connection.limits"
 });
 
 // ─── comboHooks integration: only connectionId is passed ────────────
-test("Integration: comboHooks pattern — key total enforced when only connectionId is passed (mocked repo)", async () => {
-  // We can't easily mock the dynamic import in a unit test, but we
-  // can verify the resolver path: a caller passing only connectionId
-  // and pre-built `connection` object must still hit key_total.
+test("Integration: comboHooks pattern — key total enforced with preloaded connection object", async () => {
+  // comboHooks.beforeComboModelAttempt only passes { provider, model,
+  // connectionId, body } — no `connection`. In production the
+  // throttle lazy-loads the connection via getProviderConnectionById.
+  // We can't easily mock that dynamic import in a unit test, so we
+  // simulate the lazy-load result by passing a pre-built connection
+  // object directly. The resolver / scope path is the same.
   const connectionId = "conn_int1";
   const conn = { id: connectionId, data: { keyLimits: { rpm: 3, policy: "reject-429" } } };
 
@@ -149,7 +152,7 @@ test("Integration: comboHooks pattern — key total enforced when only connectio
   assert.match(res.reason, /key_total_rpm_exceeded/);
 });
 
-test("Integration: comboHooks pattern — key model enforced when only connectionId is passed", async () => {
+test("Integration: comboHooks pattern — key model enforced with preloaded connection object", async () => {
   const connectionId = "conn_int2";
   const conn = { id: connectionId, data: { modelLimits: { modelA: { rpm: 1, policy: "reject-429" } } } };
 
@@ -282,4 +285,23 @@ test("legacy connection.data.limits is honoured only when the resolver is called
   // skipConnectionLayer=true → connection layer must be ignored.
   // testprov has no registry entry, no inferred ctx, so it must be null.
   assert.equal(legacyOff, null, "skipConnectionLayer=true must drop connection.data.limits");
+});
+
+// ─── Edge case: key_total=1 across multiple models on the same key ───
+// Even if each model has its own generous cap, a key_total of 1 means
+// the SECOND request across ANY model on that key must be blocked.
+test("Key Total Limit edge case: key_total=1 blocks every model after the first", async () => {
+  const connectionId = "conn_key_total_edge";
+  const conn = { data: { keyLimits: { rpm: 1, policy: "reject-429" } } };
+
+  // First request across the whole key (any model) consumes the only slot.
+  recordRequestOutcome({ provider: "testprov", model: "modelA", connectionId });
+
+  // Second request on a DIFFERENT model must still be blocked.
+  const res = await acquireQuotaSlot({
+    provider: "testprov", model: "modelB",
+    connectionId, connection: conn,
+  });
+  assert.equal(res.acquired, false);
+  assert.match(res.reason, /key_total_rpm_exceeded/);
 });

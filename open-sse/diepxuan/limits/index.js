@@ -115,14 +115,21 @@ export function mergeLimits(...layers) {
  * Resolve the effective limits for a (provider, model, connection) triple.
  * Returns null if no source provides a usable limit (means: do not throttle).
  *
- * NOTE: this resolver is for **Model Global** limits. The connection's
- * per-key override (`connection.limits`) is intentionally considered
- * here because the comment in the previous version said "connection
- * beats all other layers" — and downstream tests rely on that behaviour.
- * The 3-tier throttle then ALSO reads `keyLimits` / `modelLimits` from
- * the same connection via the dedicated helpers below; it never feeds
- * this resolver's output into the key scopes, so the global tier
- * cannot leak into other keys.
+ * Flags:
+ *   - `skipConnectionLayer` (default `false`): when `true`, the
+ *     per-key override stored at `connection.data.limits` is
+ *     ignored. The 3-tier throttle always sets this to `true`
+ *     when computing the **Model Global** tier, so a single
+ *     key's per-key cap cannot leak into the global scope and
+ *     block other keys sharing the same model. Callers that
+ *     want the legacy "connection beats all other layers"
+ *     behaviour should keep the default `false`.
+ *
+ * Note on `concurrency`: the field is included in the merged
+ * result for logging / dashboard display, but the throttle
+ * engine currently does NOT enforce a per-process concurrency
+ * semaphore against it (it only enforces rpm/tpm/rph/rpd).
+ * Tracking issue: open follow-up to wire a semaphore.
  */
 export function getResolvedLimits({ provider, model, connection, connectionId, contextWindow, isFreeTier, skipConnectionLayer = false }) {
   if (!isDiepXuanEnabled()) return null;

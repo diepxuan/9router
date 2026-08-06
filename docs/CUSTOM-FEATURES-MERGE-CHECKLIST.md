@@ -72,6 +72,7 @@ Các provider custom trong fork layer, base registry không sửa.
 - Union của 3 tầng dùng cho **logging + `policy` + `maxWaitMs`** (KHÔNG dùng để quyết định acquire/wait — 3 scope đếm độc lập).
 - Precedence (cao → thấp): **`modelGlobal > keyModel > keyTotal`**. Tầng cao hơn ghi đè trường trùng; tầng thấp chỉ fill field chưa ai set.
 - Implement: `[keyTotal, keyModel, modelGlobal].filter(Boolean).reduce((acc, l) => ({ ...acc, ...l }), null)` — phần tử CUỐI mảng thắng, đúng rule.
+- **Known follow-up:** field `concurrency` hiện được merge vào `effectiveLimits` cho logging / dashboard nhưng throttle CHƯA enforce semaphore per-process. Tracking issue: bổ sung semaphore ở PR tiếp theo.
 - `policy` và `maxWaitMs` cũng theo rule này: tầng strictest (vd `modelGlobal.policy=reject-429`) KHÔNG bị downgrade bởi tầng looser (vd `keyTotal.policy=wait-then-send`).
 - **Tại sao `keyTotal` là lowest?** Đây là "safety net" tổng — nó chỉ fill field nào các tầng trên chưa set. Nếu keyTotal thắng tầng trên, một key có `keyLimits.rpm=5` sẽ chặn mọi model trên key đó xuống 5 rpm, kể cả khi model đó được registry cho phép 30 rpm → oan.
 
