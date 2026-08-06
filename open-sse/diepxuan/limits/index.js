@@ -23,21 +23,6 @@ import REGISTRY from "../../providers/registry/index.js";
 import { getAutoDiscoveredLimits } from "./autoDiscovery.js";
 import { inferLimitsFromContext } from "./inference.js";
 
-// ─── Tier 1-3: registry-declared ───────────────────────────────────────
-
-/**
- * Find a registry entry by id (or alias). Returns the full entry — including
- * the `limits` block at the top and the `models[]` array with per-model
- * limits. Defensive against missing registry.
- *
- * Registry semantics: fork overrides are appended AFTER the base entry and
- * the LAST entry with the same id wins (see diepxuan/registry/*.js wiring).
- * So this must use the last match, not the first — otherwise fork-declared
- * limits (e.g. NVIDIA free tier, Kilo 200 rph) get shadowed by the base entry.
- *
- * @param {string} provider
- * @returns {object|null}
- */
 function findRegistryEntry(provider) {
   if (!Array.isArray(REGISTRY)) return null;
   let found = null;
@@ -47,11 +32,6 @@ function findRegistryEntry(provider) {
   return found;
 }
 
-/**
- * Read provider-level limits (the `limits` block at the top of the registry).
- * @param {string} provider
- * @returns {object|null}
- */
 export function getProviderLimits(provider) {
   if (!isDiepXuanEnabled() || !provider) return null;
   const reg = findRegistryEntry(provider);
@@ -59,12 +39,6 @@ export function getProviderLimits(provider) {
   return reg.limits || null;
 }
 
-/**
- * Read model-level limits (the `limits` field inside a model entry).
- * @param {string} provider
- * @param {string} model
- * @returns {object|null}
- */
 export function getModelLimits(provider, model) {
   if (!isDiepXuanEnabled() || !provider || !model) return null;
   const reg = findRegistryEntry(provider);
@@ -74,33 +48,30 @@ export function getModelLimits(provider, model) {
   return entry.limits || null;
 }
 
-// ─── Tier 1: connection-level override ──────────────────────────────────
-
 /**
- * Read limits stored inside a connection's data JSON blob.
- * Defensive: never throws; returns null on missing connection or bad data.
- *
- * @param {object|null|undefined} connection
- * @returns {object|null}
+ * Read the JSON blob stored on a connection. Two input shapes are supported:
+ *   1. Raw DB row: { data: '{ "limits": ... }' }  — `data` is a JSON string.
+ *   2. Flattened connection from connectionsRepo.getProviderConnectionById():
+ *      { data: { limits, keyLimits, modelLimits, ... } } — `data` is an object
+ *      already parsed and merged with row columns.
+ * Both must work because throttle.lazy-load uses the flattened shape, while
+ * tests / callers with raw rows still pass a string.
  */
-export function getConnectionLimitsFromObj(connection) {
-  if (!isDiepXuanEnabled() || !connection) return null;
+function readConnectionData(connection) {
+  if (!connection) return null;
   let data = connection.data;
   if (typeof data === "string") {
     try { data = JSON.parse(data); } catch (_) { return null; }
   }
-  if (!data || typeof data !== "object") return null;
-  return data.limits || null;
+  return (data && typeof data === "object") ? data : null;
 }
 
-/**
- * Async wrapper for connection repo. Lazy import to avoid a hard dep cycle
- * with src/lib/db at module-load time (some paths import this from places
- * where the DB is not yet initialised).
- *
- * @param {string} connectionId
- * @returns {Promise<object|null>}
- */
+export function getConnectionLimitsFromObj(connection) {
+  if (!isDiepXuanEnabled() || !connection) return null;
+  const data = readConnectionData(connection);
+  return data ? (data.limits || null) : null;
+}
+
 export async function getConnectionLimits(connectionId) {
   if (!isDiepXuanEnabled() || !connectionId) return null;
   try {
@@ -108,37 +79,14 @@ export async function getConnectionLimits(connectionId) {
     const conn = await repo.getProviderConnectionById(connectionId);
     return getConnectionLimitsFromObj(conn);
   } catch (err) {
-    // Missing repo on tests / forks without the connection layer → no-op
     return null;
   }
 }
 
-// ─── Tier 4: auto-discovered from previous 429s ─────────────────────────
-
-// Re-export for ergonomics
 export { getAutoDiscoveredLimits };
-
-// ─── Tier 5: models.dev inference (PR #63) ─────────────────────────────
-
-// Re-export for ergonomics
 export { inferLimitsFromContext };
 
-// ─── Resolver ───────────────────────────────────────────────────────────
-
-/**
- * Merge multiple limit objects, lower-priority first → higher-priority last.
- * Numeric fields are taken from the FIRST object that defines them (i.e. the
- * highest priority). Source strings are concatenated for debugging.
- *
- * @param {...object|null|undefined} layers - high → low priority
- * @returns {object|null}
- */
 export function mergeLimits(...layers) {
-  // Layers are passed high → low priority (e.g. [connection, model, provider,
-  // auto, inferred]). Numeric fields come from the FIRST layer that defines
-  // them — i.e. the highest priority. policy / maxWaitMs follow the same
-  // rule. Source strings are concatenated in their natural order so the UI
-  // can show "connection <- model <- provider" for debugging.
   const out = {};
   const sources = [];
   let policy;
@@ -167,43 +115,33 @@ export function mergeLimits(...layers) {
  * Resolve the effective limits for a (provider, model, connection) triple.
  * Returns null if no source provides a usable limit (means: do not throttle).
  *
- * @param {object} args
- * @param {string} args.provider
- * @param {string} args.model
- * @param {string|null|undefined} [args.connectionId]
- * @param {object|null|undefined} [args.connection]  - pre-loaded connection obj
- * @param {number|null|undefined} [args.contextWindow] - for inference fallback
- * @param {boolean} [args.isFreeTier]
- * @returns {object|null}
+ * NOTE: this resolver is for **Model Global** limits. The connection's
+ * per-key override (`connection.limits`) is intentionally considered
+ * here because the comment in the previous version said "connection
+ * beats all other layers" — and downstream tests rely on that behaviour.
+ * The 3-tier throttle then ALSO reads `keyLimits` / `modelLimits` from
+ * the same connection via the dedicated helpers below; it never feeds
+ * this resolver's output into the key scopes, so the global tier
+ * cannot leak into other keys.
  */
-export function getResolvedLimits({ provider, model, connectionId, connection, contextWindow, isFreeTier }) {
+export function getResolvedLimits({ provider, model, connection, connectionId, contextWindow, isFreeTier, skipConnectionLayer = false }) {
   if (!isDiepXuanEnabled()) return null;
   if (!provider || !model) return null;
 
-  const connLayer = getConnectionLimitsFromObj(connection);
+  const connLayer = skipConnectionLayer ? null : getConnectionLimitsFromObj(connection);
   const modelLayer = getModelLimits(provider, model);
   const providerLayer = getProviderLimits(provider);
-  const autoLayer = getAutoDiscoveredLimits(connectionId, provider, model);
+  const autoLayer = getAutoDiscoveredLimits(connectionId || null, provider, model);
   const inferred = (contextWindow != null)
     ? inferLimitsFromContext({ contextWindow, isFreeTier })
     : null;
 
-  // Precedence: connection > model > provider > auto > inferred
   const merged = mergeLimits(connLayer, modelLayer, providerLayer, autoLayer, inferred);
   return merged;
 }
 
-// Re-export the pure parser for tests / external callers
-export { extractLimitsFromError } from "./errorParser.js";
-export { recordAutoDiscoveredLimits, initAutoDiscoveredLimitsTable } from "./autoDiscovery.js";
-
-
 // ─── 3-Tier Granular Limits (Key Total, Key Per-Model, Model Global) ──
 
-/**
- * Read Key Total limits from registry or connection data.
- * Applied across ALL models sharing this connection/key.
- */
 export function getProviderKeyLimits(provider) {
   if (!isDiepXuanEnabled() || !provider) return null;
   const reg = findRegistryEntry(provider);
@@ -212,11 +150,8 @@ export function getProviderKeyLimits(provider) {
 
 export function getKeyLimitsFromConnectionObj(connection) {
   if (!isDiepXuanEnabled() || !connection) return null;
-  let data = connection.data;
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); } catch (_) { return null; }
-  }
-  return (data && typeof data === "object") ? (data.keyLimits || null) : null;
+  const data = readConnectionData(connection);
+  return data ? (data.keyLimits || null) : null;
 }
 
 export function getResolvedKeyTotalLimits({ provider, connection }) {
@@ -226,16 +161,9 @@ export function getResolvedKeyTotalLimits({ provider, connection }) {
   return mergeLimits(connKey, provKey);
 }
 
-/**
- * Read Key Per-Model limits from connection data or registry model entry.
- * Applied to a specific model when invoked through this key/connection.
- */
 export function getKeyModelLimitsFromConnectionObj(connection, model) {
   if (!isDiepXuanEnabled() || !connection || !model) return null;
-  let data = connection.data;
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); } catch (_) { return null; }
-  }
+  const data = readConnectionData(connection);
   if (!data || typeof data !== "object") return null;
   if (data.modelLimits && typeof data.modelLimits === "object") {
     return data.modelLimits[model] || null;
@@ -257,3 +185,6 @@ export function getResolvedKeyModelLimits({ provider, model, connection }) {
   const regKeyModel = getRegistryKeyModelLimits(provider, model);
   return mergeLimits(connKeyModel, regKeyModel);
 }
+
+export { extractLimitsFromError } from "./errorParser.js";
+export { recordAutoDiscoveredLimits, initAutoDiscoveredLimitsTable } from "./autoDiscovery.js";

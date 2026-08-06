@@ -45,14 +45,27 @@ Các provider custom trong fork layer, base registry không sửa.
 - **File đổi:** `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs`.
 - **Smoke test:** `node --test tests/unit/limits-resolution.test.mjs` pass 26/26.
 
-### 2026-08-05 — 3-Tier Rate Limits Enforcement (Key Total + Key Per-Model + Model Global)
+### 2026-08-06 — 3-Tier Rate Limits Enforcement (Key Total + Key Per-Model + Model Global)
 
 - **Feature:** Nâng cấp hệ thống rate limits từ 1 tầng per-model sang **3 tầng độc lập**:
   1. **Key Total (`keyLimits`)**: Tổng tất cả model dùng chung 1 key/connection (scope `conn:<id>:<provider>/*`).
   2. **Key Per-Model (`modelLimitsPerKey` / `connection.modelLimits[model]`)**: Giới hạn của 1 key khi dùng cho 1 model cụ thể (scope `conn:<id>:<provider>/<model>`).
   3. **Model Global (`modelLimits` / `provider.limits` / `auto` / `inferred`)**: Giới hạn chung của model đó toàn hệ thống (scope `global:<provider>/<model>`).
-- **File đổi:** `open-sse/diepxuan/limits/index.js`, `open-sse/diepxuan/limits/throttle.js`, `tests/unit/three-tier-limits.test.mjs`.
-- **Smoke test:** `node --test tests/unit/three-tier-limits.test.mjs` pass 6/6; toàn bộ 55 rate limit tests pass; `check-custom-features.mjs` pass 771/771.
+- **Bug fix đính kèm (2026-08-06):**
+  1. `getResolvedLimits` giờ nhận `skipConnectionLayer`. Throttle chủ động bật cờ này khi tính Model Global để `connection.limits` (per-key) KHÔNG rò vào scope global — nếu không, 1 key có thể chặn mọi key khác dùng cùng model.
+  2. `getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chấp nhận cả hai dạng: `connection.data` là JSON-string (raw row) lẫn object đã được `connectionsRepo.getProviderConnectionById` trải phẳng. Trước đó chỉ nhận raw row, nên `loadConnectionById` thực tế không áp được per-key limits.
+  3. Dọn dead code (đoạn unreachable sau khi tái cấu trúc) trong `acquireQuotaSlot`.
+- **File đổi:**
+  - `open-sse/diepxuan/limits/index.js` — `getResolvedKeyTotalLimits`, `getResolvedKeyModelLimits`, helper `readConnectionData`, `skipConnectionLayer`.
+  - `open-sse/diepxuan/limits/throttle.js` — `loadConnectionById`, 3 scope builders, `effectiveLimits = union(tiers)`, `skipConnectionLayer: true` cho global tier.
+  - `tests/unit/three-tier-limits.test.mjs` — 10 test (resolver + 3-tier throttle + comboHooks integration + 2 hồi quy).
+  - `tests/unit/models-limits-api.test.mjs` — cập nhật kỳ vọng sau khi fork registry bổ sung NVIDIA free-tier (PR #64).
+  - `docs/custom-features.manifest.json` — pattern cho 3-tier rate limits + bỏ pattern cũ đã obsolete.
+- **Smoke test:**
+  - `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **63/63 PASS**.
+  - `node --test tests/unit/*.test.mjs` → **90/90 PASS** (toàn bộ unit test).
+  - `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
+- **Backward compatibility:** Tầng nào không khai báo limits sẽ tự động bypass check. `skipConnectionLayer` mặc định `false` nên caller cũ (`getResolvedLimits` với cờ mặc định) giữ nguyên hành vi đã pass test trước PR này.
 
 ### 2. Context length system
 
