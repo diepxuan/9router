@@ -143,8 +143,14 @@ export async function acquireQuotaSlot({
   // Model Global skips the connection-key layer so a key's `connection.limits`
   // can never leak into the global scope and block other keys sharing the
   // same model. (This was a real bug in the prior commit — see fix fde7a0a2.)
+  //
+  // `connectionId` is forwarded on purpose: the auto-discovered limits layer
+  // (ADR-007 §2.4) is keyed by (connectionId, provider, model) and
+  // `getAutoDiscoveredLimits` short-circuits to `null` when connectionId is
+  // missing. Without this, throttle would never pick up limits learned from
+  // a previous 429 for the same key. (Fix shipped as PR #68 follow-up.)
   const modelGlobalLimits = getResolvedLimits({
-    provider, model, connection: conn, contextWindow, isFreeTier,
+    provider, model, connection: conn, connectionId, contextWindow, isFreeTier,
     skipConnectionLayer: true,
   });
 

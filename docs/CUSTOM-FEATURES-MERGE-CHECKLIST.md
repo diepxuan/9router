@@ -86,9 +86,26 @@ Các provider custom trong fork layer, base registry không sửa.
   - Muốn giữ cũ (chỉ áp cho Model Global, không phân biệt key): bỏ trống — registry/auto/inferred sẽ quyết định.
 - Lock hợp đồng bằng test `legacy connection.data.limits is honoured only when the resolver is called without skipConnectionLayer` (xem `tests/unit/three-tier-limits.test.mjs`).
 
+#### Bug fixed in this PR follow-up (key-limits shape compat + auto-discovery wiring)
+
+Hai bug runtime phát hiện sau khi 3-tier commit đầu tiên (6405ff88 → fde7a0a2 → 7a3daffb) đã được sửa thành commit tiếp theo trong cùng nhánh PR #68:
+
+1. **`getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chỉ đọc `connection.data.{keyLimits,modelLimits}`** (helper mới chỉ nhận raw row). Trong khi đó `connectionsRepo.getProviderConnectionById` trả về hình dạng `rowToConn` — JSON blob được spread lên top-level: `{ id, provider, keyLimits, modelLimits, ... }` KHÔNG có `data` wrapper. Hệ quả: per-key limits không bao giờ được áp ở production vì throttle lazy-load đúng hình dạng top-level.
+   - **Fix:** thêm 2 helper nội bộ `readKeyLimitsFromConnectionObj` / `readKeyModelLimitsFromConnectionObj` chấp nhận cả top-level và `data` wrapper; `getKeyLimitsFromConnectionObj` / `getKeyModelLimitsFromConnectionObj` chuyển sang dùng helper này. Tương tự với `getConnectionLimitsFromObj` cho legacy `connection.limits`.
+   - **Lock:** test `getResolvedKeyTotalLimits reads top-level keyLimits (rowToConn shape)` + `getKeyModelLimitsFromConnectionObj reads top-level modelLimits (rowToConn shape)` + `getResolvedKeyModelLimits merges top-level modelLimits over registry` + `acquireQuotaSlot applies key_total limits from a top-level-shaped connection (runtime repro)`.
+
+2. **`getAutoDiscoveredLimits` ở Model Global tier bị bỏ sót vì throttle truyền `connectionId=null`.** `getAutoDiscoveredLimits` short-circuits to `null` khi thiếu `connectionId`; throttle gọi `getResolvedLimits` cho Model Global mà KHÔNG truyền `connectionId` → auto-discovered limits (học từ 429 trước) trở thành dead code.
+   - **Fix:** throttle truyền `connectionId` cho `getResolvedLimits` ở Model Global tier.
+   - **Lock:** test `Model Global tier applies auto-discovered limits when connectionId is forwarded` — ghi row trực tiếp vào `auto_discovered_limits_diepxuan` rồi assert `acquireQuotaSlot` block với `model_global_rpm_exceeded`.
+
+**Bài học cho agent/session sau:**
+- `connectionsRepo.getProviderConnectionById` LUÔN trả về JSON blob đã spread lên top-level. Bất kỳ helper nào đọc `data.{key,model,limits}` cần check cả top-level.
+- Bất kỳ code nào gọi `getAutoDiscoveredLimits` / `getResolvedLimits` đều phải forward `connectionId`, kể cả khi compute Model Global tier (vì tier này vẫn cần auto-discovery lookup).
+
+
 #### Verify
-- `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **68/68 PASS** (gồm 5 test precedence mới + 1 test lock behavior change).
-- `node --test tests/unit/*.test.mjs` → **95/95 PASS** (toàn bộ unit test).
+- `node --test tests/unit/three-tier-limits.test.mjs tests/unit/limits-throttle.test.mjs tests/unit/limits-resolution.test.mjs tests/unit/limits-auto-discovery.test.mjs tests/unit/models-limits-api.test.mjs` → **74/74 PASS** (gồm 5 test precedence + 1 test lock behavior change + 4 test hồi quy top-level + 1 test auto-discovery + 3 test edge-case từ d0d00cc4).
+- `node --test tests/unit/*.test.mjs` → **101/101 PASS** (toàn bộ unit test; +6 test hồi quy cho 2 bug trên).
 - `node scripts/diepxuan/check-custom-features.mjs` → **771/771 PASS**.
 
 ### 2. Context length system

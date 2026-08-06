@@ -49,13 +49,22 @@ export function getModelLimits(provider, model) {
 }
 
 /**
- * Read the JSON blob stored on a connection. Two input shapes are supported:
- *   1. Raw DB row: { data: '{ "limits": ... }' }  — `data` is a JSON string.
- *   2. Flattened connection from connectionsRepo.getProviderConnectionById():
- *      { data: { limits, keyLimits, modelLimits, ... } } — `data` is an object
- *      already parsed and merged with row columns.
- * Both must work because throttle.lazy-load uses the flattened shape, while
- * tests / callers with raw rows still pass a string.
+ * Read the JSON blob stored on a connection. Three input shapes are supported:
+ *   1. Raw DB row from a SELECT on providerConnections:
+ *        { data: '{ "limits": ... }' }
+ *      `data` is a JSON string.
+ *   2. Flattened connection from connectionsRepo.getProviderConnectionById()
+ *      that still wraps the JSON under `data`:
+ *        { data: { limits, keyLimits, modelLimits, ... } }
+ *   3. Top-level spread — the REAL runtime shape of `rowToConn`: the `data`
+ *      JSON is spread at top-level, so `keyLimits` / `modelLimits` / `limits`
+ *      are siblings of `id`, `provider`, ... and there is NO `data` wrapper:
+ *        { id, provider, keyLimits: { rpm: 5 }, modelLimits: { foo: { rpm: 1 } }, ... }
+ *
+ * All three must work because throttle.lazy-load uses shape #3, callers that
+ * keep a raw DB row use shape #1, and a handful of tests still pass shape #2.
+ *
+ * Returns the parsed JSON object, or null on missing/malformed input.
  */
 function readConnectionData(connection) {
   if (!connection) return null;
@@ -66,8 +75,50 @@ function readConnectionData(connection) {
   return (data && typeof data === "object") ? data : null;
 }
 
+/**
+ * Read `keyLimits` from a connection, accepting both the runtime top-level
+ * shape (the real shape of `rowToConn`) and the `data` wrapper. Without this,
+ * `acquireQuotaSlot` would never see per-key limits in production because
+ * `connectionsRepo.getProviderConnectionById` returns the JSON blob spread
+ * at top-level.
+ */
+function readKeyLimitsFromConnectionObj(connection) {
+  if (!connection) return null;
+  if (connection.keyLimits && typeof connection.keyLimits === "object") {
+    return connection.keyLimits;
+  }
+  const data = readConnectionData(connection);
+  if (data && data.keyLimits && typeof data.keyLimits === "object") {
+    return data.keyLimits;
+  }
+  return null;
+}
+
+/**
+ * Same as readKeyLimitsFromConnectionObj but for `modelLimits[model]`.
+ */
+function readKeyModelLimitsFromConnectionObj(connection, model) {
+  if (!connection || !model) return null;
+  const topMap = connection.modelLimits;
+  if (topMap && typeof topMap === "object"
+      && topMap[model] && typeof topMap[model] === "object") {
+    return topMap[model];
+  }
+  const data = readConnectionData(connection);
+  if (data && data.modelLimits && typeof data.modelLimits === "object"
+      && data.modelLimits[model] && typeof data.modelLimits[model] === "object") {
+    return data.modelLimits[model];
+  }
+  return null;
+}
+
 export function getConnectionLimitsFromObj(connection) {
   if (!isDiepXuanEnabled() || !connection) return null;
+  // Legacy field `connection.limits` is the per-key global-scope override.
+  // Accept it at both top-level (real runtime shape) and inside `data`.
+  if (connection.limits && typeof connection.limits === "object") {
+    return connection.limits;
+  }
   const data = readConnectionData(connection);
   return data ? (data.limits || null) : null;
 }
@@ -117,8 +168,9 @@ export function mergeLimits(...layers) {
  *
  * Flags:
  *   - `skipConnectionLayer` (default `false`): when `true`, the
- *     per-key override stored at `connection.data.limits` is
- *     ignored. The 3-tier throttle always sets this to `true`
+ *     per-key override stored at `connection.data.limits` (or its
+ *     top-level sibling `connection.limits` after rowToConn spread)
+ *     is ignored. The 3-tier throttle always sets this to `true`
  *     when computing the **Model Global** tier, so a single
  *     key's per-key cap cannot leak into the global scope and
  *     block other keys sharing the same model. Callers that
@@ -157,8 +209,7 @@ export function getProviderKeyLimits(provider) {
 
 export function getKeyLimitsFromConnectionObj(connection) {
   if (!isDiepXuanEnabled() || !connection) return null;
-  const data = readConnectionData(connection);
-  return data ? (data.keyLimits || null) : null;
+  return readKeyLimitsFromConnectionObj(connection);
 }
 
 export function getResolvedKeyTotalLimits({ provider, connection }) {
@@ -170,12 +221,7 @@ export function getResolvedKeyTotalLimits({ provider, connection }) {
 
 export function getKeyModelLimitsFromConnectionObj(connection, model) {
   if (!isDiepXuanEnabled() || !connection || !model) return null;
-  const data = readConnectionData(connection);
-  if (!data || typeof data !== "object") return null;
-  if (data.modelLimits && typeof data.modelLimits === "object") {
-    return data.modelLimits[model] || null;
-  }
-  return null;
+  return readKeyModelLimitsFromConnectionObj(connection, model);
 }
 
 export function getRegistryKeyModelLimits(provider, model) {

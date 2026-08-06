@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   getResolvedKeyTotalLimits,
   getResolvedKeyModelLimits,
+  getKeyModelLimitsFromConnectionObj,
   getResolvedLimits,
+  recordAutoDiscoveredLimits,
 } from "../../open-sse/diepxuan/limits/index.js";
 
 import {
@@ -304,4 +306,77 @@ test("Key Total Limit edge case: key_total=1 blocks every model after the first"
   });
   assert.equal(res.acquired, false);
   assert.match(res.reason, /key_total_rpm_exceeded/);
+});
+
+
+// ─── P0-#1 fix: keyLimits/modelLimits at top-level (real runtime shape) ───
+// `connectionsRepo.getProviderConnectionById` returns the JSON blob spread
+// at top-level (rowToConn), so the per-key fields sit next to `id` /
+// `provider` rather than under `connection.data`. Without the fix, throttle
+// would never see per-key limits in production.
+test("getResolvedKeyTotalLimits reads top-level keyLimits (rowToConn shape)", () => {
+  const conn = { id: "cid", provider: "nvidia", keyLimits: { rpm: 4, tpm: 1, policy: "reject-429" } };
+  const lim = getResolvedKeyTotalLimits({ provider: "nvidia", connection: conn });
+  assert.ok(lim);
+  assert.equal(lim.rpm, 4);
+  assert.equal(lim.tpm, 1);
+  assert.equal(lim.policy, "reject-429");
+});
+
+test("getKeyModelLimitsFromConnectionObj reads top-level modelLimits (rowToConn shape)", () => {
+  const conn = { id: "cid", provider: "nvidia", modelLimits: { "z-ai/glm-5.2": { rpm: 6, tpm: 1, policy: "reject-429" } } };
+  const lim = getKeyModelLimitsFromConnectionObj(conn, "z-ai/glm-5.2");
+  assert.ok(lim);
+  assert.equal(lim.rpm, 6);
+  assert.equal(lim.policy, "reject-429");
+});
+
+test("getResolvedKeyModelLimits merges top-level modelLimits over registry", () => {
+  const conn = { id: "cid", provider: "nvidia", modelLimits: { "z-ai/glm-5.2": { rpm: 6, policy: "wait-then-send" } } };
+  const lim = getResolvedKeyModelLimits({ provider: "nvidia", model: "z-ai/glm-5.2", connection: conn });
+  assert.ok(lim);
+  assert.equal(lim.rpm, 6, "top-level modelLimits must win over registry");
+  assert.equal(lim.policy, "wait-then-send");
+});
+
+test("acquireQuotaSlot applies key_total limits from a top-level-shaped connection (runtime repro)", async () => {
+  const connectionId = "conn_p0_fix_runtime";
+  // Real rowToConn shape: no `data` wrapper.
+  const conn = { id: connectionId, provider: "testprov", keyLimits: { rpm: 2, policy: "reject-429" } };
+  // Two requests on model1 exhaust the key total.
+  recordRequestOutcome({ provider: "testprov", model: "model1", connectionId });
+  recordRequestOutcome({ provider: "testprov", model: "model1", connectionId });
+  const res = await acquireQuotaSlot({
+    provider: "testprov", model: "model2",
+    connectionId, connection: conn,
+  });
+  assert.equal(res.acquired, false, "key_total from top-level shape must still block");
+  assert.match(res.reason, /key_total_rpm_exceeded/);
+});
+
+
+// ─── P0-#2 fix: Model Global tier must forward connectionId so auto-discovered
+// limits (learned from a previous 429) actually throttle future requests. ───
+// `getAutoDiscoveredLimits` short-circuits to null when connectionId is
+// missing, so before the fix every acquireQuotaSlot call would skip the
+// auto-discovered layer entirely.
+test("Model Global tier applies auto-discovered limits when connectionId is forwarded", async () => {
+  const connectionId = "conn_p0_fix_autodiscovery";
+  const provider = "unregistered-provider-zzz";
+  const model = "unregistered-model-zzz";
+  // Seed a 429-derived row directly. No registry entry, no contextWindow → the
+  // auto-discovered layer is the ONLY source of limits for this triple.
+  const written = recordAutoDiscoveredLimits({
+    connectionId,
+    provider,
+    model,
+    limits: { rpm: 1, policy: "reject-429" },
+    evidence: "test seed",
+  });
+  assert.equal(written, true, "auto-discovered row should be written");
+  // First request consumes the only slot; second one must be blocked.
+  recordRequestOutcome({ provider, model, connectionId });
+  const res = await acquireQuotaSlot({ provider, model, connectionId });
+  assert.equal(res.acquired, false, "auto-discovered rpm=1 must block the 2nd request");
+  assert.match(res.reason, /model_global_rpm_exceeded/);
 });
