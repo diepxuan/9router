@@ -28,7 +28,6 @@ Các provider custom trong fork layer, base registry không sửa.
 | Groq expansion + capabilities | `open-sse/diepxuan/registry/groq.js`, `open-sse/providers/capabilities.js` |
 | Qoder un-deprecate | `open-sse/diepxuan/registry/qoder.js` |
 | NVIDIA free catalog (48 models) | `open-sse/diepxuan/registry/nvidia.js` |
-| NVIDIA + Kilo Code rate limits (provider/override tiers) | `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs` |
 | OpenAI chat-compatible registry | `open-sse/diepxuan/registry/openai.js`, `open-sse/providers/registry/index.js` |
 | LLMGateway free/cheap gateway | `open-sse/diepxuan/registry/llmgateway.js`, `open-sse/providers/registry/index.js` |
 | Kilo Code free hosted models | `open-sse/diepxuan/registry/kilocode.js`, `open-sse/providers/registry/index.js` |
@@ -37,13 +36,6 @@ Các provider custom trong fork layer, base registry không sửa.
 | Wire vào registry | `open-sse/providers/registry/index.js` |
 
 `src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js` là base file; chỉ thêm import + render badge từ fork layer (`ModelFreeBadge.jsx`) để hiển thị model free.
-
-### 2026-08-05 — Rate-limit registry overrides + resolver fix
-
-- **Feature:** Khai báo `limits` trong NVIDIA registry (provider-level 40 rpm / 1M tpm / concurrency 5 + model override `z-ai/glm-5.2` = 30 rpm, 500k tpm) và Kilo Code (provider-level 200 rph / 4 rpm).
-- **Bug fix:** `open-sse/diepxuan/limits/index.js findRegistryEntry` trả entry đầu tiên thay vì entry cuối, khiến fork overrides (ví dụ limits NVIDIA/Kilo) bị base entry (id trùng) shadow. Đã sửa lấy **last match** đúng semantics "last wins".
-- **File đổi:** `open-sse/diepxuan/registry/nvidia.js`, `open-sse/diepxuan/registry/kilocode.js`, `open-sse/diepxuan/limits/index.js`, `tests/unit/limits-resolution.test.mjs`.
-- **Smoke test:** `node --test tests/unit/limits-resolution.test.mjs` pass 26/26.
 
 ### 2. Context length system
 
@@ -56,19 +48,6 @@ Các provider custom trong fork layer, base registry không sửa.
 | UI ctx badges (combo + provider) | `combos/page.js`, `combo/[id]/page.js`, `providers/[id]/ModelRow.js` |
 | Source priority api > static > error | `contextLength/cache.js` |
 | Đọc ưu tiên static > error | `contextLength/index.js` (`getContextLengthSync`, batch) |
-
-### 3. Rate-limit engine (ADR-007)
-
-| Feature | File chính |
-|---|---|
-| Metadata resolution | `open-sse/diepxuan/limits/index.js` |
-| Auto-discovery từ 429 | `limits/autoDiscovery.js`, `autoDiscoverHook.js`, `errorParser.js` |
-| Throttle sliding window | `limits/throttle.js`, `cache.js`, `window.js` |
-| Combo fail tracker + skip | `open-sse/diepxuan/comboHooks.js`, `comboFailTracker.js`, `services/combo.js` |
-| Wire vào core | `handlers/chatCore.js`, `utils/error.js`, `services/accountFallback.js` |
-| Limits API | `src/app/api/models/limits/route.js` |
-| Limits badge UI | `src/diepxuan/app/dashboard/providers/ModelLimitBadge.jsx`, `providers/[id]/ModelRow.js`, `page.js` |
-| `/v1/models` limits enrichment | `src/app/api/v1/models/route.js` |
 
 ### 4. Fork transformers & executors
 
@@ -122,7 +101,6 @@ Cả hai PASS mới push.
 
 - `tests/unit/stripCodexModelMarkers.test.mjs` — strip `[` marker trong text + body messages
 - `tests/unit/context-length-priority.test.mjs` — static 1M thắng error 256K
-- `tests/unit/models-limits-api.test.mjs` — resolved limits + inferred source
 
 Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 
@@ -130,7 +108,6 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 
 - Proxy: `curl http://localhost:3000/api/health`
 - Combo: mở `/dashboard/combos`, kiểm tra ctx badge + fallback
-- Rate limit: gửi request vượt RPM, kiểm tra throttle/fallback
 - Console log: mở `/dashboard/console-log`
 - `/v1/models`: kiểm tra `context_length` có giá trị
 

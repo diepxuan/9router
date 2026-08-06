@@ -3,18 +3,18 @@
 // Base `open-sse/providers/registry/nvidia.js` is unchanged. This module
 // applies DiepXuan-only adjustments:
 //   1. Remove EOL / moved-away models (verified via live API):
-//      - minimaxai/minimax-m2.7 (EOL 2026-07-27, moved to Groq hosting)
+//      - mistralai/minimax-m2.7 (EOL 2026-07-27, moved to Groq hosting)
 //      - mistralai/mistral-large-3-675b-instruct-2512 (EOL 2026-07-23)
 //      - qwen/qwen3-coder-480b-a35b-instruct (EOL 2026-06-11)
 //   2. Add/refresh NVIDIA NIM free model catalog (verified via
 //      https://integrate.api.nvidia.com/v1/models on 2026-07-31).
-//   3. Declare free-tier rate limits (provider level + hot-model override) so
-//      the limits badge and throttle stop relying on context inference. Values
-//      per ADR-007 (docs/UPDATE-2026-07-28.md) and 429 hints: 40 requests/min,
-//      1M tokens/min.
 //
 // Wired via d6 in open-sse/providers/registry/index.js → appended after
 // the base entry, the last entry with id="nvidia" wins.
+//
+// Note: rate-limit `limits` declarations (NVIDIA_FREE_TIER_LIMITS /
+// MODEL_LIMIT_OVERRIDES) were removed in PR #68 re-scope; the throttle
+// engine no longer exists. See MEMORY.md §4 nợ kỹ thuật.
 
 import baseNvidia from "../../providers/registry/nvidia.js";
 
@@ -22,26 +22,9 @@ function isForkEnabled() {
   return process.env.DIEPXUAN_ENABLED !== "false";
 }
 
-// Free-tier default for every NVIDIA NIM key (tier 3 in ADR-007 precedence).
-const NVIDIA_FREE_TIER_LIMITS = {
-  rpm: 40,
-  tpm: 1_000_000,
-  concurrency: 5,
-  source: "build.nvidia.com free-tier (40rpm/1Mtpm)",
-};
-
-// Model-level overrides — tiers tighter than the provider default.
-const MODEL_LIMIT_OVERRIDES = {
-  "z-ai/glm-5.2": {
-    rpm: 30,
-    tpm: 500_000,
-    source: "build.nvidia.com/z-ai/glm-5.2",
-  },
-};
-
 // Removed from NVIDIA free tier (EOL / moved to other host).
 const REMOVED_MODEL_IDS = new Set([
-  "minimaxai/minimax-m2.7",
+  "mistralai/minimax-m2.7",
   "mistralai/mistral-large-3-675b-instruct-2512",
   "qwen/qwen3-coder-480b-a35b-instruct",
 ]);
@@ -105,16 +88,9 @@ for (const m of ADDITIONAL_MODELS) {
   }
 }
 
-const mergedWithLimits = merged.map((m) =>
-  m && MODEL_LIMIT_OVERRIDES[m.id]
-    ? { ...m, limits: { ...(m.limits || {}), ...MODEL_LIMIT_OVERRIDES[m.id] } }
-    : m
-);
-
 const override = {
   ...baseNvidia,
-  limits: NVIDIA_FREE_TIER_LIMITS,
-  models: mergedWithLimits,
+  models: merged,
 };
 
 export default isForkEnabled() ? override : baseNvidia;

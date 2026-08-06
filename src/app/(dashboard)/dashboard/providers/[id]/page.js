@@ -64,7 +64,6 @@ export default function ProviderDetailPage() {
   const [bulkUpdatingProxy, setBulkUpdatingProxy] = useState(false);
   const [providerStrategy, setProviderStrategy] = useState(null);
   const [modelContextLengths, setModelContextLengths] = useState({});
-  const [modelLimits, setModelLimits] = useState({});
   const [providerStickyLimit, setProviderStickyLimit] = useState("");
   const [thinkingMode, setThinkingMode] = useState("auto");
   const [autoPing, setAutoPing] = useState({ enabled: false, connections: {} });
@@ -160,10 +159,6 @@ export default function ProviderDetailPage() {
     fetch(`/api/models/context-lengths?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { contextLengths: {} }))
       .then((data) => { if (!cancelled) setModelContextLengths(data.contextLengths || {}); })
-      .catch(() => {});
-    fetch(`/api/models/limits?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { limits: {} }))
-      .then((data) => { if (!cancelled) setModelLimits(data.limits || {}); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [providerId, modelIdsKey]);
@@ -1150,7 +1145,6 @@ export default function ProviderDetailPage() {
             isFree={false}
             caps={getCaps(`${providerId}/${model.id}`)}
             contextLength={modelContextLengths[`${providerId}/${model.id}`]}
-            limits={modelLimits[`${providerId}/${model.id}`]}
             thinkingSuffix={resolveThinkingSuffix(model.id)}
           />
         ))}
@@ -1178,8 +1172,7 @@ export default function ProviderDetailPage() {
               onDisable={() => handleDisableModel(model.id)}
               caps={getCaps(`${providerId}/${model.id}`)}
               contextLength={modelContextLengths[`${providerId}/${model.id}`]}
-              limits={modelLimits[`${providerId}/${model.id}`]}
-              thinkingSuffix={resolveThinkingSuffix(model.id)}
+                thinkingSuffix={resolveThinkingSuffix(model.id)}
             />
           );
         })}

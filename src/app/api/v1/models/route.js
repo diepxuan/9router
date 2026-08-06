@@ -19,7 +19,6 @@ import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 import { capabilitiesFromServiceKind, getCapabilitiesForModel } from "open-sse/providers/capabilities.js";
 import { resolveProviderModelsWithContext } from "open-sse/diepxuan/contextLength/modelsApi.js";
 import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
-import { getResolvedLimits } from "open-sse/diepxuan/limits/index.js";
 
 // Per-provider live model resolvers. Each receives a connection record and
 // returns { models: [{ id, name? }, ...] } | null on failure.
@@ -512,14 +511,6 @@ export async function buildModelsList(kindFilter, options = {}) {
       const contextLength = cached?.contextLength || getStaticContextLength(model.id);
       if (typeof contextLength === "number" && contextLength > 0) {
         model.context_length = contextLength;
-      }
-      // diepxuan: expose resolved rate limits (OpenAI-compatible model metadata).
-      const slash = model.id.indexOf("/");
-      if (slash > 0) {
-        const provider = model.id.slice(0, slash);
-        const modelName = model.id.slice(slash + 1);
-        const limits = getResolvedLimits({ provider, model: modelName, contextWindow: contextLength || null });
-        if (limits) model.limits = limits;
       }
     }
     dedupedModels.push(model);

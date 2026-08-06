@@ -143,13 +143,13 @@ describe("DiepXuan combo fail tracker hook", () => {
     const log = { debug: vi.fn() };
 
     resetComboFailTracker(comboName);
-    expect(beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: false });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: false });
 
     recordComboModelOutcome(model, comboName, false);
     recordComboModelOutcome(model, comboName, false);
     recordComboModelOutcome(model, comboName, false);
 
-    expect(beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: true });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName, log })).toEqual({ skip: true });
     expect(log.debug).toHaveBeenCalledWith("COMBO", `Skipping ${model} (fail count exceeded)`);
   });
 
@@ -166,13 +166,13 @@ describe("DiepXuan combo fail tracker hook", () => {
     resetComboFailTracker(comboName);
     afterComboModelAttempt({ modelStr: model, comboName, ok: false });
     afterComboModelAttempt({ modelStr: model, comboName, ok: false });
-    expect(beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
 
     afterComboModelAttempt({ modelStr: model, comboName, ok: false });
-    expect(beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: true });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: true });
 
     afterComboModelAttempt({ modelStr: model, comboName, ok: true });
-    expect(beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
+    expect(await beforeComboModelAttempt({ modelStr: model, comboName })).toEqual({ skip: false });
   });
 
   it("skips a combo model after repeated failures and resets on success", async () => {
