@@ -284,3 +284,35 @@ test("requestId persists after entry completes (for snapshot history)", () => {
   assert.ok(entry.completedAt);
   assert.ok(entry.requestId, "requestId survives completion");
 });
+
+// ── depth tracks combo nesting level ─────────────────────────────────
+test("Top-level combo (empty stack) sets depth = 0", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "root" with 2 models');
+  const snap = getLiveSnapshot();
+  const entry = snap.entries.find((e) => e.name === "root");
+  assert.equal(entry.depth, 0, "top-level entry has depth 0");
+});
+
+test("Nested combo (stack non-empty) sets depth = stack length before push", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "parent" with 2 models');
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "child" with 2 models');
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "grandchild" with 1 model');
+  const snap = getLiveSnapshot();
+  const parent = snap.entries.find((e) => e.name === "parent");
+  const child = snap.entries.find((e) => e.name === "child");
+  const grandchild = snap.entries.find((e) => e.name === "grandchild");
+  assert.equal(parent.depth, 0);
+  assert.equal(child.depth, 1, "child depth = 1 (nested under parent)");
+  assert.equal(grandchild.depth, 2, "grandchild depth = 2");
+});
+
+test("Model pushed inside nested combo inherits entry.depth", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "parent" with 2 models');
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "child" with 1 model');
+  parseLineForLive('[12:34:51] [INFO] [COMBO] Trying model 1/1: foo');
+  const snap = getLiveSnapshot();
+  const child = snap.entries.find((e) => e.name === "child");
+  assert.equal(child.models.length, 1);
+  assert.equal(child.models[0].name, "foo");
+  assert.equal(child.models[0].depth, 1, "model inherits child.depth=1");
+});

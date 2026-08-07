@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
-
 /**
  * DiepXuan fork-layer: live fallback chain visualization.
  *
- * Each entry from the tracker carries a `requestId` — entries sharing the same
- * requestId belong to the same top-level client request (root combo + its
- * nested children). This view collapses each request into a single row so the
- * user sees "one line per client request", and expands nested combos on click.
+ * Each entry from the tracker carries a `requestId` (root = top-level combo
+ * pushed onto an empty scope stack; nested = inherit root.key). This view
+ * merges all entries sharing the same requestId into ONE single row whose
+ * models[] is flattened from root + every nested combo in chronological order.
+ *
+ * Result: one row per client request with one horizontal model chain. No
+ * expansion, no nested recursion, no accordion — just a flat line per request.
+ *
+ * Sort order (top to bottom):
+ *   success (newest first) → running → failed (oldest last)
  *
  * Auto-updates via SSE from /api/diepxuan/console-log/live/stream.
  */
@@ -22,7 +26,6 @@ export default function LiveFallbackChain({ entries }) {
     );
   }
 
-  // Group entries by requestId. Each group = one top-level client request.
   const groups = groupByRequestId(list);
 
   return (
@@ -35,145 +38,99 @@ export default function LiveFallbackChain({ entries }) {
 }
 
 // ── Grouping helper ───────────────────────────────────────────────────
+// Roll up status across root + nested entries.
+function computeRolledStatus(root, nested) {
+  const all = [root, ...nested];
+  return all.reduce((acc, e) => {
+    if (e.status === "failed" || e.status === "failed_final") return "failed";
+    if (acc === "failed") return "failed";
+    if (e.completedAt) return acc === "failed" ? "failed" : "success";
+    return acc === "success" ? "success" : "running";
+  }, "running");
+}
+
 function groupByRequestId(entries) {
   const map = new Map();
   for (const e of entries) {
-    // Fallback: if entry lacks requestId (legacy snapshot), use its own key
-    // so it still renders as its own row instead of being silently dropped.
     const rid = e.requestId || e.key;
     if (!map.has(rid)) {
       map.set(rid, { requestId: rid, root: null, nested: [] });
     }
     const g = map.get(rid);
     if (e.key === rid || !g.root) {
-      // Root = entry whose key matches requestId (top-level push)
       g.root = e;
     } else {
       g.nested.push(e);
     }
   }
-  return Array.from(map.values()).sort(
-    (a, b) => (b.root?.startedAt || 0) - (a.root?.startedAt || 0)
-  );
+  // Sort: success (newest) → running → failed (oldest)
+  const STATUS_WEIGHT = { success: 0, running: 1, failed: 2 };
+  return Array.from(map.values()).sort((a, b) => {
+    const sa = STATUS_WEIGHT[computeRolledStatus(a.root, a.nested)] ?? 1;
+    const sb = STATUS_WEIGHT[computeRolledStatus(b.root, b.nested)] ?? 1;
+    if (sa !== sb) return sa - sb;
+    return (b.root?.startedAt || 0) - (a.root?.startedAt || 0);
+  });
 }
 
-// ── Per-request row ──────────────────────────────────────────────────
+// ── Per-request row ───────────────────────────────────────────────────
 function RequestRow({ group }) {
   const { root, nested } = group;
-  const isGrouped = nested.length > 0;
-  const [expanded, setExpanded] = useState(false);
+  if (!root) return null;
 
-  // If the root itself was popped from the stack, fall back to first entry
-  // that still has meaningful info.
-  const display = root || (nested[0] || {});
-  const completed = display.completedAt;
-  const isCombo = display.kind === "combo";
-  const total = display.totalModels || display.models?.length || 0;
-  const models = display.models || [];
+  // Sort nested by startedAt so models appear in chronological order.
+  const nestedSorted = [...nested].sort((a, b) => a.startedAt - b.startedAt);
+
+  // Flatten all models from root + nested into one chain.
+  // Each model keeps its own status (✓/✗/⏳) and timestamp.
+  const flatModels = [];
+  for (const entry of [root, ...nestedSorted]) {
+    for (const m of (entry.models || [])) {
+      flatModels.push(m);
+    }
+  }
+
+  const rolledStatus = computeRolledStatus(root, nestedSorted);
+  const isCombo = root.kind === "combo";
+  const totalAttempts = 1 + nestedSorted.length;
+  const allCompleted = flatModels.length > 0
+    && flatModels.every((m) => m.status === "success" || m.status === "failed" || m.status === "failed_final");
 
   const statusBadge = isCombo
-    ? display.status === "success" ? "bg-green-900/50 text-green-300"
-    : display.status === "failed" ? "bg-red-900/50 text-red-300"
+    ? rolledStatus === "success" ? "bg-green-900/50 text-green-300"
+    : rolledStatus === "failed" ? "bg-red-900/50 text-red-300"
     : "bg-orange-900/50 text-orange-300"
     : "bg-blue-900/50 text-blue-300";
 
-  const nestedBadge = isGrouped
-    ? "bg-purple-900/50 text-purple-300"
-    : "bg-gray-800 text-gray-500";
+  const statusIcon = rolledStatus === "success" ? " ✓"
+    : rolledStatus === "failed" ? " ✗"
+    : " ⏳";
 
   return (
-    <div className={`p-3 rounded-lg border ${completed ? "border-gray-800 opacity-75" : "border-gray-700 bg-gray-900"}`}>
+    <div className={`p-3 rounded-lg border ${allCompleted ? "border-gray-800 opacity-75" : "border-gray-700 bg-gray-900"}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusBadge}`}>
           {isCombo ? "COMBO" : "SINGLE"}
         </span>
         <span className="text-sm font-mono text-gray-200 truncate">
-          {display.name || "(unnamed)"}
-        </span>
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${nestedBadge}`}>
-          {isGrouped ? `×${nested.length + 1} nested` : "×1"}
+          {root.name || "(unnamed)"}
         </span>
         <span className="text-xs text-gray-500 ml-auto font-mono">
-          {display.startTime || "?"}
-          {completed ? " ✓" : " ⏳"}
-          {total > 0 && ` · ${models.length}/${total}`}
+          {root.startTime || "?"}{statusIcon}
+          {flatModels.length > 0 && ` · ${flatModels.length} models`}
+          {totalAttempts > 1 && ` · ${totalAttempts} attempts`}
         </span>
-        {isGrouped && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-500"
-          >
-            {expanded ? "▾ hide nested" : "▸ show nested"}
-          </button>
-        )}
       </div>
 
-      {/* Root chain */}
+      {/* Single horizontal chain of all models (root + nested flattened) */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        {models.length === 0 ? (
+        {flatModels.length === 0 ? (
           <span className="text-xs text-gray-500 italic">no models attempted yet</span>
         ) : (
-          models.map((m, i) => (
+          flatModels.map((m, i) => (
             <div key={i} className="flex items-center gap-1 flex-shrink-0">
-              <ModelNode model={m} index={i + 1} />
-              {i < models.length - 1 && <Arrow />}
-            </div>
-          ))
-        )}
-        {models.length === 0 && !completed && (
-          <div className="flex items-center gap-1 text-gray-500 text-xs">
-            <span className="animate-pulse">⏳</span> starting…
-          </div>
-        )}
-      </div>
-
-      {/* Nested chains (collapsed by default) */}
-      {expanded && isGrouped && (
-        <div className="mt-2 pl-3 border-l border-gray-700 space-y-2">
-          {nested.map((entry, i) => (
-            <NestedRow key={entry.key || i} entry={entry} index={i + 1} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function NestedRow({ entry, index }) {
-  const isCombo = entry.kind === "combo";
-  const total = entry.totalModels || entry.models?.length || 0;
-  const models = entry.models || [];
-  const completed = entry.completedAt;
-  const statusBadge = isCombo
-    ? entry.status === "success" ? "bg-green-900/50 text-green-300"
-    : entry.status === "failed" ? "bg-red-900/50 text-red-300"
-    : "bg-orange-900/50 text-orange-300"
-    : "bg-blue-900/50 text-blue-300";
-
-  return (
-    <div className={`p-2 rounded border ${completed ? "border-gray-800" : "border-gray-700 bg-gray-900/50"}`}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-[10px] text-gray-500 font-mono">↳ #{index}</span>
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${statusBadge}`}>
-          {isCombo ? "COMBO" : "SINGLE"}
-        </span>
-        <span className="text-xs font-mono text-gray-300 truncate">
-          {entry.name || "(unnamed)"}
-        </span>
-        <span className="text-[10px] text-gray-500 ml-auto font-mono">
-          {entry.startTime || "?"}{completed ? " ✓" : " ⏳"}
-          {total > 0 && ` · ${models.length}/${total}`}
-        </span>
-      </div>
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        {models.length === 0 ? (
-          <span className="text-[10px] text-gray-500 italic">no models attempted yet</span>
-        ) : (
-          models.map((m, i) => (
-            <div key={i} className="flex items-center gap-1 flex-shrink-0">
-              <ModelNode model={m} index={i + 1} compact />
-              {i < models.length - 1 && <Arrow />}
+              <ModelNode model={m} index={i + 1} depth={m.depth ?? 0} />
+              {i < flatModels.length - 1 && <Arrow />}
             </div>
           ))
         )}
@@ -182,12 +139,16 @@ function NestedRow({ entry, index }) {
   );
 }
 
-function ModelNode({ model, index, compact = false }) {
+function ModelNode({ model, index, depth = 0 }) {
+  // Status color (green/red/yellow/gray) stays as-is for success/fail/trying.
+  // Nested models (depth > 0) get an extra purple left border so users can
+  // tell at a glance which models belong to a nested combo without breaking
+  // the flat horizontal chain layout.
   const statusStyle =
-    model.status === "success" ? "border-green-500 bg-green-950/40"
-    : model.status === "failed" || model.status === "failed_final" ? "border-red-500 bg-red-950/40"
-    : model.status === "trying" ? "border-yellow-500 bg-yellow-950/30 animate-pulse"
-    : "border-gray-600 bg-gray-800";
+    model.status === "success" ? (depth > 0 ? "border-green-500 border-l-4 border-l-purple-500 bg-green-950/40" : "border-green-500 bg-green-950/40")
+    : model.status === "failed" || model.status === "failed_final" ? (depth > 0 ? "border-red-500 border-l-4 border-l-purple-500 bg-red-950/40" : "border-red-500 bg-red-950/40")
+    : model.status === "trying" ? (depth > 0 ? "border-yellow-500 border-l-4 border-l-purple-500 bg-yellow-950/30 animate-pulse" : "border-yellow-500 bg-yellow-950/30 animate-pulse")
+    : (depth > 0 ? "border-gray-600 border-l-4 border-l-purple-500 bg-gray-800" : "border-gray-600 bg-gray-800");
   const icon =
     model.status === "success" ? "✓"
     : model.status === "failed" ? "✗"
@@ -200,12 +161,11 @@ function ModelNode({ model, index, compact = false }) {
     : model.status === "trying" ? "text-yellow-400"
     : "text-gray-400";
   const display = String(model.name || "").split("/").pop() || model.name;
-  const widthCls = compact ? "w-20" : "w-24";
   return (
-    <div className={`${widthCls} p-1.5 rounded border ${statusStyle}`}>
-      <div className="text-[10px] text-gray-500 text-center">#{index}</div>
-      <div className="text-[10px] truncate text-center font-mono">{display}</div>
-      <div className={`text-center text-sm ${iconColor}`}>{icon}</div>
+    <div className={`flex items-center gap-1 px-2 py-1 rounded border ${statusStyle} flex-shrink-0`}>
+      <span className="text-[10px] text-gray-500 font-mono">#{index}</span>
+      <span className="text-xs font-mono truncate">{display}</span>
+      <span className={`text-sm ${iconColor}`}>{icon}</span>
     </div>
   );
 }

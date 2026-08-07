@@ -148,7 +148,9 @@ export function parseLineForLive(line) {
     if (!state.activeCombos.has(key)) {
       // diepxuan: requestId groups nested combos under the same top-level request.
       // First entry pushed to an empty stack is the root; nested entries inherit root.key.
+      // diepxuan: depth tracks how many combo scopes wrap this entry (0 = top-level).
       const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
+      const depth = state.scopeStack.length;
       state.activeCombos.set(key, {
         key,
         kind: "combo",
@@ -160,6 +162,7 @@ export function parseLineForLive(line) {
         status: "running",
         completedAt: null,
         requestId,
+        depth,
       });
       state.scopeStack.push(key);
     }
@@ -173,6 +176,7 @@ export function parseLineForLive(line) {
     const key = newKey("combo:" + name, ts(line));
     if (!state.activeCombos.has(key)) {
       const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
+      const depth = state.scopeStack.length;
       state.activeCombos.set(key, {
         key,
         kind: "combo",
@@ -184,6 +188,7 @@ export function parseLineForLive(line) {
         status: "running",
         completedAt: null,
         requestId,
+        depth,
       });
       state.scopeStack.push(key);
     }
@@ -196,6 +201,7 @@ export function parseLineForLive(line) {
     const key = newKey("single", ts(line));
     if (!state.activeCombos.has(key)) {
       const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
+      const depth = state.scopeStack.length;
       state.activeCombos.set(key, {
         key,
         kind: "single",
@@ -207,6 +213,7 @@ export function parseLineForLive(line) {
         status: "running",
         completedAt: null,
         requestId,
+        depth,
       });
       state.scopeStack.push(key);
     }
@@ -223,6 +230,7 @@ export function parseLineForLive(line) {
         name: modelStr.trim(),
         status: "trying",
         time: ts(line),
+        depth: entry.depth ?? 0,
       });
     }
     return;
