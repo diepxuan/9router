@@ -50,6 +50,9 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 |-------|--------|-------|
 | CHANGELOG bị ngắt quãng | Không còn áp dụng | Fork đã chuyển sang dùng `docs/CUSTOM-FEATURES-MERGE-CHECKLIST.md` làm changelog duy nhất (theo AGENTS.md §7). `CHANGELOG.md` giữ nguyên bản upstream làm tham chiếu. |
 | Rate-limit engine (ADR-007) | Đã xóa (PR #68 re-scope, 2026-08-06) | Xóa engine throttle + auto-discovery + `/api/models/limits` + `ModelLimitBadge` + NVIDIA/Kilo limit declarations + 3-tier scope builders. Giữ combo fail tracker + ctx skip + fallback tức thời + response model override. Nếu sau cần throttle, fork lại từ upstream main, không dùng code đã xóa. |
+| MiMo free 441 cooldown | Đã xóa (PR #71, 2026-08-06) | Strip `open-sse/diepxuan/executors/mimo-free.js` + `DiepxuanMimoFreeExecutor` + `MIMO_RATE_LIMIT_CODES`. 441 trượt qua upstream parser, combo fallback chain xử lý đồng nhất. Follow-up #2 trong nhật ký 2026-08-06 đã giải quyết. |
+| DB cleanup (`rate_limit_counters_diepxuan`/`auto_discovered_limits_diepxuan`) | Đã xóa (PR #70, 2026-08-06) | Schema migration v2 drop 2 bảng qua `src/lib/db/migrations/002-drop-rate-limit-tables.js`. Pre-migration backup tự động qua `migrate.js` (`schemaChanging`). `SCHEMA_VERSION` 1→2. Follow-up #3 trong nhật ký 2026-08-06 đã giải quyết. |
+| `diepxuan-feature-flags.test.js` test drift | Đã xử lý (PR #69, 2026-08-06) | Restore `isDiepXuanSafeMode()` trong `flags.js` (function body bị thiếu từ upstream drift) + drop 4 dead tests import `@/diepxuan/usage/index.js` (module không tồn tại) + sửa 3 expected values. Test 7/7 PASS. Follow-up #4 trong nhật ký 2026-08-06 đã giải quyết. |
 | Tài liệu Identity trùng lặp | Đã xử lý (PR #44, 2026-07-21) | PA A single source of truth đã merge. Tổng dòng 956 -> 731 (-23.5%). Xem PR https://github.com/diepxuan/9router/pull/44. |
 | Workspace `.git` read-only | Đã ghi nhận (2026-07-21) | `.git` mount `ro` trong môi trường dev hiện tại — mọi thao tác tạo nhánh/commit/cherry-pick cần Sếp phê duyệt. Xem `TOOLS.md §13`. |
 
@@ -75,6 +78,10 @@ Danh sách tổng quan (40+ providers): xem [SOUL.md §4](./SOUL.md#4-chuyên-m�
 
 | Ngày | Sự kiện |
 |------|---------|
+| 2026-08-06 | PR #69 merged (squash `836a908e`): restore `isDiepXuanSafeMode()` trong `flags.js` + drop 4 dead tests (import module không tồn tại) + sửa 3 expected `{skip:true}` → `{skip:true,reason:"fail_count_exceeded"}` khớp comboHooks. `diepxuan-feature-flags.test.js` 7/7 PASS (was 4/11). Follow-up #4 giải quyết. |
+| 2026-08-06 | PR #70 merged (squash `982a14c0`): schema migration v2 drop 2 bảng `rate_limit_counters_diepxuan` (436 rows) + `auto_discovered_limits_diepxuan` (4 rows) — orphan từ ADR-007 đã bị strip ở PR #68. Pre-migration backup tự động qua `migrate.js`. Follow-up #3 giải quyết. |
+| 2026-08-06 | PR #71 merged (squash `cec2ff8e`): drop MiMo free 441 cooldown — strip `open-sse/diepxuan/executors/mimo-free.js` + manifest entry; 441 giờ trượt qua upstream parser → combo fallback chain xử lý đồng nhất |
+| 2026-08-07 | Console log live activity tracker: SSE client counter + active combo/single + fallback chain visualization (PR #72) |
 | 2026-08-06 | PR #68 merged (squash `5f25a49`): re-scoped combo-only; dropped ADR-007 rate-limit engine (throttle/auto-discovery/api/ui/registry declarations) |
 | 2026-07-31 | Context length system: API /api/models/context-lengths, combo ctx skip, ctx badges combo + provider UI, source priority api > static > error, NVIDIA 48 free models |
 | 2026-07-30 | Commit series trên basemain: governance, CI/CD, Enhanced Console Log, CLI baseUrl, provider expansion, web combo fallback, response model override, rate-limit engine + wire, sharedDb, context length |

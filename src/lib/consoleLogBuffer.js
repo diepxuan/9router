@@ -1,5 +1,8 @@
 import { EventEmitter } from "events";
 import { CONSOLE_LOG_CONFIG } from "@/shared/constants/config.js";
+// diepxuan: live activity tracker for the dashboard Console Log (PR #72).
+// Minimal hook — tracker is a no-op if DiepXuan layer is disabled.
+import { parseLineForLive } from "../diepxuan/lib/consoleLogLiveTracker.js";
 
 const consoleLevels = ["log", "info", "warn", "error", "debug"];
 
@@ -69,6 +72,8 @@ function appendLine(line) {
     state.logs = state.logs.slice(-maxLines);
   }
   state.pendingLines.push(line);
+  // diepxuan: feed live tracker for dashboard Console Log "nhìn vào là biết" view.
+  try { parseLineForLive(line); } catch (_) { /* tracker must never break logging */ }
   if (state.pendingLines.length >= MAX_BATCH_LINES) {
     if (state.flushTimer) {
       clearTimeout(state.flushTimer);

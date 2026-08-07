@@ -69,6 +69,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | Feature | File chính |
 |---|---|
 | Enhanced Console Log | `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx`, `console-log/page.js` |
+| Console log live activity tracker | `src/diepxuan/lib/consoleLogLiveTracker.js`, `LiveConsoleHeader.jsx`, `LiveFallbackChain.jsx`, `/api/diepxuan/console-log/live/stream`, base patch `consoleLogBuffer.js` + `console-logs/stream/route.js` |
 | CLI tools current-origin endpoint | `src/diepxuan/app/dashboard/cli-tools/baseUrl.js` + tool cards |
 | Codex subagent description | `cli-tools/codex.js`, `CodexToolCard.js`, `codex-settings/route.js` |
 | Combo curl dynamic baseUrl | `combo/[id]/page.js` |
@@ -109,6 +110,7 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - Proxy: `curl http://localhost:3000/api/health`
 - Combo: mở `/dashboard/combos`, kiểm tra ctx badge + fallback
 - Console log: mở `/dashboard/console-log`
+- Console log live: mở `/dashboard/console-log`, kiểm tra badge client/combo/single + fallback chain cập nhật realtime
 - `/v1/models`: kiểm tra `context_length` có giá trị
 
 ## Ghi chú merge/rebase
@@ -125,3 +127,28 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - Added Chat Completions quirks: strip `text` and force `reasoning_effort: "none"` when tools are present for `gpt-5.4*`, `gpt-5.5`, and `gpt-5.6-*`.
 - Cleaned NVIDIA EOL model ids and added static context length for `z-ai/glm-5.2` (200k).
 - Smoke tests: `node --test tests/unit/paramSupportHooks.test.mjs tests/unit/openai-fork-registry.test.mjs`, `node --check` target files, registry import, fork custom-feature checker.
+
+### 2026-08-07 - Console Log request grouping + depth indicator
+
+**Mục đích**: Mỗi client request hiển thị 1 dòng duy nhất trong Enhanced Console Log, không phải 1 dòng per combo instance (giảm noise khi combo chain có nhiều nested).
+
+**File thay đổi**:
+- `src/diepxuan/lib/consoleLogLiveTracker.js`: thêm `requestId` (root = own key, nested inherit root's key qua scope stack) + `depth` (0 = top-level, N = nested N cấp). Model push capture `entry.depth` để biết thuộc combo ở depth nào.
+- `src/diepxuan/app/dashboard/console-log/LiveFallbackChain.jsx`: group entries theo `requestId`, flatten models của root + nested thành 1 chain ngang. Sort `success > running > failed`. Model `depth > 0` hiển thị border-l-4 border-l-purple-500 để phân biệt model con mà không phá layout chain.
+- `tests/unit/diepxuan-console-log-tracker.test.mjs`: 3 test mới verify `depth` propagation (root depth=0, nested depth=N, model inherit).
+
+**Quyết định thiết kế**:
+- Flatten chain (không expand/nested accordion) — Sếp yêu cầu "1 client request = 1 dòng".
+- Sort `success > running > failed` — failed xuống dưới cùng để dễ thấy lỗi.
+- Border tím trái cho model con — phân biệt visual mà không indent/prefix.
+
+**Smoke test**:
+- Mở `/dashboard/console-log` khi có request đang chạy → quan sát mỗi client request hiển thị 1 row.
+- Trigger 1 request có nhiều nested combo (vd gpt-5.5 → minimax → minimax-cn) → verify tất cả models flatten thành 1 chain ngang, model con có border tím.
+- Trigger 1 request fail → verify row fail xuống dưới cùng.
+
+**Verify**:
+- `node --check consoleLogLiveTracker.js`: OK
+- `node_modules/.bin/eslint LiveFallbackChain.jsx`: OK
+- `node scripts/diepxuan/check-custom-features.mjs`: 634/634 PASS
+- `node --test tests/unit/*.test.mjs`: 51/51 PASS

@@ -1,4 +1,6 @@
 import { getConsoleLogs, getConsoleEmitter, initConsoleLogCapture } from "@/lib/consoleLogBuffer";
+// diepxuan: track SSE client connections for dashboard Console Log live counter (PR #72).
+import { registerClient, unregisterClient } from "@/diepxuan/lib/consoleLogLiveTracker.js";
 
 export const dynamic = "force-dynamic";
 
@@ -7,12 +9,14 @@ initConsoleLogCapture();
 export async function GET(request) {
   const encoder = new TextEncoder();
   const emitter = getConsoleEmitter();
-  const state = { closed: false, send: null, sendLines: null, sendClear: null, keepalive: null };
+  const state = { closed: false, send: null, sendLines: null, sendClear: null, keepalive: null, clientId: null };
 
   // Idempotent: safe to call from request.signal abort, cancel(), or enqueue failure.
   const cleanup = () => {
     if (state.closed) return;
     state.closed = true;
+    // diepxuan: drop this client from the live counter (PR #72).
+    if (state.clientId) { unregisterClient(state.clientId); state.clientId = null; }
     if (state.send) emitter.off("line", state.send);
     if (state.sendLines) emitter.off("lines", state.sendLines);
     if (state.sendClear) emitter.off("clear", state.sendClear);
@@ -25,6 +29,8 @@ export async function GET(request) {
 
   const stream = new ReadableStream({
     start(controller) {
+      // diepxuan: register this SSE client for the live counter (PR #72).
+      state.clientId = registerClient();
       // Send all buffered logs immediately on connect
       const buffered = getConsoleLogs();
       if (buffered.length > 0) {
