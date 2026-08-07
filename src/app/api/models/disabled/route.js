@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDisabledModels, disableModels, enableModels } from "@/lib/disabledModelsDb";
+import { removeModelsFromAllCombos } from "@/lib/localDb";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,10 @@ export async function POST(request) {
       return NextResponse.json({ error: "providerAlias and ids[] required" }, { status: 400 });
     }
     await disableModels(providerAlias, ids);
-    return NextResponse.json({ success: true });
+    // diepxuan: keep combos in sync — a disabled model must not stay
+    // referenced inside any combo (would 400 on every retry as if EOL).
+    const combosUpdated = await removeModelsFromAllCombos(ids, providerAlias);
+    return NextResponse.json({ success: true, combosUpdated });
   } catch (error) {
     console.log("Error disabling models:", error);
     return NextResponse.json({ error: "Failed to disable models" }, { status: 500 });

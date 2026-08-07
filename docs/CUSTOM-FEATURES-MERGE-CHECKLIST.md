@@ -152,3 +152,63 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - `node_modules/.bin/eslint LiveFallbackChain.jsx`: OK
 - `node scripts/diepxuan/check-custom-features.mjs`: 634/634 PASS
 - `node --test tests/unit/*.test.mjs`: 51/51 PASS
+
+### 2026-08-07 - Single model provider prefix + TokenRouter icon
+
+**Mục đích**: 
+1. Single/combo model trong LiveFallbackChain hiển thị provider prefix (icon + label ngắn) trước model name — giúp scan nhanh provider đang được thử mà không cần expand.
+2. TokenRouter provider bổ sung icon tại `public/providers/tokenrouter.png` (chưa có từ trước).
+
+**File thay đổi**:
+- `public/providers/tokenrouter.png` (mới, 128×128 RGBA, 2.1 KB): 3 node trắng nối nhau trên nền tím `#8B5CF6` (đúng màu `display.color` trong registry). Phù hợp semantic "model aggregator hub". Generate qua sharp + SVG inline (no network).
+- `src/diepxuan/app/dashboard/console-log/LiveFallbackChain.jsx`:
+  - Import `REGISTRY` từ `open-sse/providers/registry/index.js`. Build `PROVIDER_IDS = new Set()` từ `id` + `alias` + `aliases` của mỗi entry (157 ids, computed once at module load).
+  - Gate provider prefix: `hasProviderPrefix = parts.length > 1 && PROVIDER_IDS.has(parts[0])`. Chỉ tách khi `parts[0]` thực sự là provider id/alias đã biết — tránh invent provider cho model không có prefix (vd `minimax`, `gpt-5.5`) hoặc path không hợp lệ (vd `minimaxai/minimax-m3`).
+  - Render trước model name: label `providerId` text-only (font-mono 10px, truncate max-w 110px, tooltip `title={providerId}`). Không icon (giữ chain compact).
+  - `modelOnly = parts[parts.length - 1]` — chỉ trailing slug. Vd `nvidia/minimaxai/minimax-m3` → `nvidia` + `minimax-m3`. `title={rawName}` trên model span để hover tooltip full path.
+
+**Quyết định thiết kế**:
+- Gate trên `PROVIDER_IDS` thay vì hardcode list — theo kịp registry khi có provider mới (vd tokenrouter, aihubmix, ...). Cùng pattern với `src/sse/services/model.js:14`.
+- Text-only label (không icon) — Sếp yêu cầu. Icon 14-16px làm chain rộng thêm, không cần thiết.
+- Trailing slug thay vì full path sau provider — Sếp yêu cầu gọn. Tooltip vẫn cho full path.
+- TokenRouter icon PNG vẫn được add để các chỗ khác trong dashboard dùng (vd Header, ModelSelectModal qua `/providers/{id}.png`); không hiển thị trong LiveFallbackChain.
+
+**Smoke test**:
+- Mở `/dashboard/console-log` khi có request đang chạy.
+- Model có prefix provider: `#5 nvidia minimax-m3 ✓` (chỉ trailing slug, có label `nvidia` ở giữa).
+- Model không có prefix: `#X minimax` hoặc `#X gpt-5.5` (không có provider label).
+- Hover vào model span → tooltip hiện full path (vd `nvidia/minimaxai/minimax-m3`).
+
+**Verify**:
+- `node_modules/.bin/eslint src/diepxuan/app/dashboard/console-log/LiveFallbackChain.jsx`: exit 0.
+- `node --test tests/unit/diepxuan-console-log-tracker.test.mjs`: 24/24 PASS.
+- `node scripts/diepxuan/check-custom-features.mjs`: 634/634 PASS.
+
+### 2026-08-07 - Cascade disable model → remove from combos
+
+**Mục đích**: Khi user disable model trong provider (vd NVIDIA `deepseek-ai/deepseek-v4-pro` / `deepseek-ai/deepseek-v4-flash` do EOL), tự động xóa model tương ứng khỏi mọi combo.models[] để combo không reference model đã chết.
+
+**File thay đổi**:
+- `src/lib/db/repos/combosRepo.js`: thêm `removeModelsFromAllCombos(ids, providerAlias?)`. Atomic transaction (`db.transaction()`), exact-match string (không prefix inference). Return count combo đã update. Log thông báo `[combosRepo] removed N entries from M combo(s) (triggered by disable on provider "X")`.
+- `src/lib/db/index.js`: re-export `removeModelsFromAllCombos`.
+- `src/lib/localDb.js`: re-export `removeModelsFromAllCombos` (back-compat shim).
+- `src/app/api/models/disabled/route.js` (POST handler): sau `disableModels()` → gọi `removeModelsFromAllCombos(ids, providerAlias)`. Response giờ trả `{success, combosUpdated}`.
+- `tests/unit/combos-remove-models.test.js` (mới, 4 case): exact match, no-op với empty/invalid, suffix không match, empty combo.models[].
+
+**Quyết định thiết kế**:
+- **General helper, không hardcode 2 model** — pattern giống `renameComboReferences` (~50 dòng), áp dụng được cho mọi provider/model trong tương lai (vd Minimax EOL, OpenAI deprecate).
+- **Exact match** — combo.models[] entries phải khớp nguyên si với id từ disable. Không tự thêm prefix (`deepseek-ai/deepseek-v4-pro` không bị xóa khi disable `nvidia/deepseek-ai/deepseek-v4-pro`).
+- **Không xóa combo rỗng** — giữ combo với `models: []` cho caller tự quyết (UI có thể hiển thị warning, hoặc user xóa tay).
+- **Base file edit hợp lệ** — `combosRepo.js` là infrastructure dùng chung nhưng helper là pure additive (function mới, không sửa existing). Đã ghi trong commit message để Sếp review.
+
+**Smoke test**:
+- Mở `/dashboard/providers/nvidia` → disable `deepseek-ai/deepseek-v4-pro`.
+- Mở `/dashboard/combos` → combo có reference model đó tự động mất entry.
+- Response API trả `{success:true, combosUpdated: N}` với N = số combo bị ảnh hưởng.
+- Check DB read-only: `~/.9router/db/data.sqlite` → `SELECT name, models FROM combos WHERE models LIKE '%deepseek-v4-pro%'` trả về 0 rows.
+
+**Verify**:
+- `node --check`: 4 file OK.
+- `vitest run tests/unit/combos-remove-models.test.js`: 4/4 PASS.
+- `vitest run tests/unit/diepxuan-feature-flags.test.js`: 7/7 PASS.
+- `node scripts/diepxuan/check-custom-features.mjs`: 634/634 PASS.
