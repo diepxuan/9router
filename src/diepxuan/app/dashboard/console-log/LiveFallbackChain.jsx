@@ -16,6 +16,16 @@
  *
  * Auto-updates via SSE from /api/diepxuan/console-log/live/stream.
  */
+import REGISTRY from "open-sse/providers/registry/index.js";
+// diepxuan: provider-id lookup so we only display provider prefix when
+// model.name actually has one. Built once at module load.
+const PROVIDER_IDS = new Set();
+for (const r of REGISTRY) {
+  PROVIDER_IDS.add(r.id);
+  if (r.alias) PROVIDER_IDS.add(r.alias);
+  for (const a of r.aliases || []) PROVIDER_IDS.add(a);
+}
+
 export default function LiveFallbackChain({ entries }) {
   const list = entries || [];
   if (list.length === 0) {
@@ -156,11 +166,26 @@ function ModelNode({ model, index, depth = 0 }) {
     : model.status === "failed" || model.status === "failed_final" ? "text-red-400"
     : model.status === "trying" ? "text-yellow-400"
     : "text-gray-400";
-  const display = String(model.name || "").split("/").pop() || model.name;
+  // Provider prefix: only show when model.name is "provider/..." AND the
+  // prefix matches a known provider id/alias. Otherwise model.name has no
+  // provider context (e.g. combo entry "minimax" without explicit prefix)
+  // and we must not invent one. Text only — no icon (keeps the horizontal
+  // chain compact at small sizes).
+  const rawName = String(model.name || "");
+  const parts = rawName.split("/").filter(Boolean);
+  const hasProviderPrefix = parts.length > 1 && PROVIDER_IDS.has(parts[0]);
+  const providerId = hasProviderPrefix ? parts[0] : "";
+  // diepxuan: show only the trailing model slug so the chain stays compact
+  // e.g. "nvidia/minimaxai/minimax-m3" -> "nvidia" + "minimax-m3"
+  // (full path remains in title for hover tooltip).
+  const modelOnly = hasProviderPrefix ? parts[parts.length - 1] : rawName;
   return (
     <div className={`flex items-center gap-1 px-2 py-1 rounded border ${statusStyle} flex-shrink-0`}>
       <span className="text-[10px] text-gray-500 font-mono">#{index}</span>
-      <span className="text-xs font-mono truncate">{display}</span>
+      {providerId && (
+        <span className="text-[10px] text-gray-400 font-mono truncate max-w-[110px]" title={providerId}>{providerId}</span>
+      )}
+      <span className="text-xs font-mono truncate" title={rawName}>{modelOnly || rawName}</span>
       <span className={`text-sm ${iconColor}`}>{icon}</span>
     </div>
   );
