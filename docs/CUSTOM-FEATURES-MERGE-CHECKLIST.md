@@ -69,6 +69,7 @@ Các provider custom trong fork layer, base registry không sửa.
 | Feature | File chính |
 |---|---|
 | Enhanced Console Log | `src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx`, `console-log/page.js` |
+| Console log live activity tracker | `src/diepxuan/lib/consoleLogLiveTracker.js`, `LiveConsoleHeader.jsx`, `LiveFallbackChain.jsx`, `/api/diepxuan/console-log/live/stream`, base patch `consoleLogBuffer.js` + `console-logs/stream/route.js` |
 | CLI tools current-origin endpoint | `src/diepxuan/app/dashboard/cli-tools/baseUrl.js` + tool cards |
 | Codex subagent description | `cli-tools/codex.js`, `CodexToolCard.js`, `codex-settings/route.js` |
 | Combo curl dynamic baseUrl | `combo/[id]/page.js` |
@@ -109,6 +110,7 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - Proxy: `curl http://localhost:3000/api/health`
 - Combo: mở `/dashboard/combos`, kiểm tra ctx badge + fallback
 - Console log: mở `/dashboard/console-log`
+- Console log live: mở `/dashboard/console-log`, kiểm tra badge client/combo/single + fallback chain cập nhật realtime
 - `/v1/models`: kiểm tra `context_length` có giá trị
 
 ## Ghi chú merge/rebase

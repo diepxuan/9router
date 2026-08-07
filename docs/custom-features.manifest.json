@@ -31,7 +31,15 @@
         "src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js",
         "src/diepxuan/app/dashboard/cli-tools/codex.js",
         "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
-        "src/app/api/cli-tools/codex-settings/route.js"
+        "src/app/api/cli-tools/codex-settings/route.js",
+        "src/app/api/diepxuan/console-log/live/route.js",
+        "src/app/api/diepxuan/console-log/live/stream/route.js",
+        "src/diepxuan/lib/consoleLogLiveTracker.js",
+        "src/diepxuan/app/dashboard/console-log/LiveConsoleHeader.jsx",
+        "src/diepxuan/app/dashboard/console-log/LiveFallbackChain.jsx",
+        "src/lib/consoleLogBuffer.js",
+        "src/app/api/translator/console-logs/stream/route.js",
+        "tests/unit/diepxuan-console-log-tracker.test.mjs"
       ],
       "requiredPatterns": [
         {
@@ -109,6 +117,50 @@
         {
           "file": "src/app/api/cli-tools/codex-settings/route.js",
           "pattern": "extendCodexSubagentConfig"
+        },
+        {
+          "file": "src/diepxuan/lib/consoleLogLiveTracker.js",
+          "pattern": "parseLineForLive"
+        },
+        {
+          "file": "src/diepxuan/lib/consoleLogLiveTracker.js",
+          "pattern": "registerClient"
+        },
+        {
+          "file": "src/diepxuan/lib/consoleLogLiveTracker.js",
+          "pattern": "getLiveSnapshot"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/LiveConsoleHeader.jsx",
+          "pattern": "LiveConsoleHeader"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/LiveFallbackChain.jsx",
+          "pattern": "LiveFallbackChain"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+          "pattern": "LiveConsoleHeader snapshot"
+        },
+        {
+          "file": "src/diepxuan/app/dashboard/console-log/EnhancedConsoleLog.jsx",
+          "pattern": "LiveFallbackChain entries"
+        },
+        {
+          "file": "src/app/api/diepxuan/console-log/live/stream/route.js",
+          "pattern": "getLiveSnapshot"
+        },
+        {
+          "file": "src/app/api/diepxuan/console-log/live/route.js",
+          "pattern": "getLiveSnapshot"
+        },
+        {
+          "file": "src/app/api/translator/console-logs/stream/route.js",
+          "pattern": "registerClient"
+        },
+        {
+          "file": "src/lib/consoleLogBuffer.js",
+          "pattern": "parseLineForLive"
         }
       ],
       "syntaxCheck": [
@@ -127,7 +179,12 @@
         "src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js",
         "src/diepxuan/app/dashboard/cli-tools/codex.js",
         "src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js",
-        "src/app/api/cli-tools/codex-settings/route.js"
+        "src/app/api/cli-tools/codex-settings/route.js",
+        "src/app/api/diepxuan/console-log/live/route.js",
+        "src/app/api/diepxuan/console-log/live/stream/route.js",
+        "src/diepxuan/lib/consoleLogLiveTracker.js",
+        "src/app/api/translator/console-logs/stream/route.js",
+        "src/lib/consoleLogBuffer.js"
       ]
     },
     {

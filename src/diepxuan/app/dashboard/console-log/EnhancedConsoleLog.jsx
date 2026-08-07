@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, Button, Input } from "@/shared/components";
+import LiveConsoleHeader from "./LiveConsoleHeader";
+import LiveFallbackChain from "./LiveFallbackChain";
 
 const LOG_LEVEL_COLORS = {
   INFO: "text-blue-400",
@@ -175,6 +177,8 @@ export default function EnhancedConsoleLog() {
   const [showSuccess, setShowSuccess] = useState(true);
   const [showErrors, setShowErrors] = useState(true);
   const [connected, setConnected] = useState(false);
+  // diepxuan: live activity snapshot from /api/diepxuan/console-log/live/stream
+  const [liveSnapshot, setLiveSnapshot] = useState({ clientCount: 0, activeCombos: 0, activeSingles: 0, entries: [] });
   const logRef = useRef(null);
   const leftPanelRef = useRef(null);
 
@@ -294,6 +298,39 @@ export default function EnhancedConsoleLog() {
     return () => es.close();
   }, []);
 
+  // diepxuan: subscribe to live activity stream for the "nhìn vào là biết" view
+  useEffect(() => {
+    let cancelled = false;
+    let es = null;
+    const connect = () => {
+      if (cancelled) return;
+      es = new EventSource("/api/diepxuan/console-log/live/stream");
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg && msg.type === "snapshot") {
+            setLiveSnapshot({
+              clientCount: msg.clientCount || 0,
+              activeCombos: msg.activeCombos || 0,
+              activeSingles: msg.activeSingles || 0,
+              entries: msg.entries || [],
+            });
+          }
+        } catch (_) {}
+      };
+      es.onerror = () => {
+        if (es) es.close();
+        // Auto-reconnect after 3s (Next.js HMR can kill the stream)
+        if (!cancelled) setTimeout(connect, 3000);
+      };
+    };
+    connect();
+    return () => {
+      cancelled = true;
+      if (es) es.close();
+    };
+  }, []);
+
   // Update requests when logs change
   useEffect(() => {
     const reqs = parseLogsIntoRequests(rawLogs);
@@ -332,7 +369,26 @@ export default function EnhancedConsoleLog() {
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] flex gap-4">
+    <div className="flex flex-col gap-3 h-[calc(100vh-120px)]">
+      {/* diepxuan: live activity header — "nhìn vào là biết" view (PR #72) */}
+      <LiveConsoleHeader snapshot={liveSnapshot} />
+      {/* diepxuan: live entries + fallback chains */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[40vh] overflow-hidden">
+        <Card>
+          <div className="px-4 pt-3 pb-2 text-sm font-semibold">LIVE COMBOS & SINGLES</div>
+          <div className="px-4 pb-3 overflow-y-auto max-h-[calc(40vh-60px)]">
+            <LiveFallbackChain entries={liveSnapshot.entries} />
+         </div>
+       </Card>
+        <Card>
+          <div className="px-4 pt-3 pb-2 text-sm font-semibold">FALLBACK CHAINS (recent</div>
+          <div className="px-4 pb-3 overflow-y-auto max-h-[calc(40vh-60px)]">
+            <LiveFallbackChain entries={liveSnapshot.entries.filter((e) => e.kind === "combo").slice(0, 10)} />
+         </div>
+       </Card>
+     </div>
+      {/* Existing layout: request list (left) + timeline (right) */}
+      <div className="flex-1 flex gap-4 min-h-0">
       {/* Left Panel - Request List */}
       <div className="w-80 flex flex-col bg-gray-900 rounded-lg overflow-hidden">
         <div className="p-3 border-b border-gray-700">
@@ -438,5 +494,6 @@ export default function EnhancedConsoleLog() {
         </div>
       </div>
     </div>
+     </div>
   );
 }
