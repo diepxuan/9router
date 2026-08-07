@@ -49,8 +49,8 @@ export default function EnhancedConsoleLog() {
       {/* live entries + fallback chains */}
       <div className="grid grid-cols-1 gap-3 flex-1 min-h-0">
         <Card>
-          <div className="px-4 pt-3 pb-2 text-sm font-semibold">LIVE COMBOS & SINGLES</div>
-          <div className="px-4 pb-3 overflow-y-auto max-h-[calc(100vh-220px)]">
+          <div className="px-0 pt-3 pb-2 text-sm font-semibold">LIVE COMBOS & SINGLES</div>
+          <div className="px-0 pb-3 overflow-y-auto max-h-[calc(100vh-220px)]">
             <LiveFallbackChain entries={liveSnapshot.entries} />
           </div>
         </Card>
