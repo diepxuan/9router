@@ -63,14 +63,10 @@ function groupByRequestId(entries) {
       g.nested.push(e);
     }
   }
-  // Sort: success (newest) → running → failed (oldest)
-  const STATUS_WEIGHT = { success: 0, running: 1, failed: 2 };
-  return Array.from(map.values()).sort((a, b) => {
-    const sa = STATUS_WEIGHT[computeRolledStatus(a.root, a.nested)] ?? 1;
-    const sb = STATUS_WEIGHT[computeRolledStatus(b.root, b.nested)] ?? 1;
-    if (sa !== sb) return sa - sb;
-    return (b.root?.startedAt || 0) - (a.root?.startedAt || 0);
-  });
+  // Sort: newest request first regardless of status (tail -f style).
+  return Array.from(map.values()).sort(
+    (a, b) => (b.root?.startedAt || 0) - (a.root?.startedAt || 0)
+  );
 }
 
 // ── Per-request row ───────────────────────────────────────────────────
