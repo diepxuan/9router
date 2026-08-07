@@ -235,3 +235,52 @@ test("Completed entries appear in snapshot but counted as 0 active", () => {
     assert.equal(e.kind, "combo");
   }
 });
+
+// ── requestId groups nested combos under same top-level request ──────
+test("Top-level combo (empty stack) sets requestId = own key", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "root1" with 2 models');
+  const snap = getLiveSnapshot();
+  const entry = snap.entries.find((e) => e.name === "root1");
+  assert.ok(entry.requestId, "requestId is set");
+  assert.equal(entry.requestId, entry.key, "top-level requestId = own key");
+});
+
+test("Nested combo (stack non-empty) inherits root.requestId", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "parent" with 2 models');
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "child" with 2 models');
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "grandchild" with 1 model');
+  const snap = getLiveSnapshot();
+  const parent = snap.entries.find((e) => e.name === "parent");
+  const child = snap.entries.find((e) => e.name === "child");
+  const grandchild = snap.entries.find((e) => e.name === "grandchild");
+  assert.equal(parent.requestId, parent.key, "parent is root");
+  assert.equal(child.requestId, parent.key, "child inherits parent.requestId");
+  assert.equal(grandchild.requestId, parent.key, "grandchild inherits parent.requestId");
+});
+
+test("Two sequential top-level combos (stack popped) have distinct requestIds", () => {
+  // Simulate 2 client requests serialized: A finishes before B starts.
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "A" with 1 model');
+  parseLineForLive('[12:34:51] [INFO] [COMBO] Trying model 1/1: foo');
+  parseLineForLive('[12:34:52] [INFO] [COMBO] Model foo succeeded'); // pops A
+  parseLineForLive('[12:34:53] [INFO] [CHAT] Combo "B" with 1 model'); // stack now empty, B is new root
+  parseLineForLive('[12:34:53] [INFO] [COMBO] Trying model 1/1: bar');
+  parseLineForLive('[12:34:54] [INFO] [COMBO] Model bar succeeded');
+  const snap = getLiveSnapshot();
+  const a = snap.entries.find((e) => e.name === "A");
+  const b = snap.entries.find((e) => e.name === "B");
+  assert.notEqual(a.requestId, b.requestId, "sequential siblings have distinct requestIds");
+  assert.equal(a.requestId, a.key, "A is its own root");
+  assert.equal(b.requestId, b.key, "B is its own root");
+});
+
+test("requestId persists after entry completes (for snapshot history)", () => {
+  parseLineForLive('[12:34:51] [INFO] [CHAT] Combo "single" with 1 model');
+  parseLineForLive('[12:34:51] [INFO] [COMBO] Trying model 1/1: foo');
+  parseLineForLive('[12:34:52] [INFO] [COMBO] Model foo succeeded');
+  const snap = getLiveSnapshot();
+  const entry = snap.entries.find((e) => e.name === "single");
+  assert.equal(entry.status, "success");
+  assert.ok(entry.completedAt);
+  assert.ok(entry.requestId, "requestId survives completion");
+});

@@ -146,6 +146,9 @@ export function parseLineForLive(line) {
     const total = parseInt(totalStr, 10);
     const key = newKey("combo:" + name, ts(line));
     if (!state.activeCombos.has(key)) {
+      // diepxuan: requestId groups nested combos under the same top-level request.
+      // First entry pushed to an empty stack is the root; nested entries inherit root.key.
+      const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
       state.activeCombos.set(key, {
         key,
         kind: "combo",
@@ -156,6 +159,7 @@ export function parseLineForLive(line) {
         models: [],
         status: "running",
         completedAt: null,
+        requestId,
       });
       state.scopeStack.push(key);
     }
@@ -168,6 +172,7 @@ export function parseLineForLive(line) {
     const [, name] = m;
     const key = newKey("combo:" + name, ts(line));
     if (!state.activeCombos.has(key)) {
+      const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
       state.activeCombos.set(key, {
         key,
         kind: "combo",
@@ -178,6 +183,7 @@ export function parseLineForLive(line) {
         models: [],
         status: "running",
         completedAt: null,
+        requestId,
       });
       state.scopeStack.push(key);
     }
@@ -189,6 +195,7 @@ export function parseLineForLive(line) {
   if (m) {
     const key = newKey("single", ts(line));
     if (!state.activeCombos.has(key)) {
+      const requestId = state.scopeStack.length === 0 ? key : state.scopeStack[0];
       state.activeCombos.set(key, {
         key,
         kind: "single",
@@ -199,6 +206,7 @@ export function parseLineForLive(line) {
         models: [],
         status: "running",
         completedAt: null,
+        requestId,
       });
       state.scopeStack.push(key);
     }
@@ -285,7 +293,7 @@ export function getLiveSnapshot() {
   const entries = [];
   const all = Array.from(state.activeCombos.values());
   const active = all.filter((e) => !e.completedAt).sort((a, b) => b.startedAt - a.startedAt);
-  const done = all.filter((e) => e.completedAt).sort((a, b) => b.completedAt - a.completedAt).slice(0, 20);
+  const done = all.filter((e) => e.completedAt).sort((a, b) => b.completedAt - a.completedAt).slice(0, 1000);
   entries.push(...active, ...done);
 
   let activeCombos = 0;

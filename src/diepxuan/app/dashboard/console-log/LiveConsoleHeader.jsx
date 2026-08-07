@@ -9,6 +9,15 @@ import { useEffect, useState } from "react";
 
 export default function LiveConsoleHeader({ snapshot }) {
   const { clientCount, activeCombos, activeSingles } = snapshot || {};
+  // diepxuan: render time only after client mount to avoid SSR/CSR hydration mismatch.
+  // Server renders "--:--:--" first; client useEffect replaces with real time and ticks every 1s.
+  const [now, setNow] = useState(null);
+  useEffect(() => {
+    const tick = () => setNow(new Date().toLocaleTimeString("vi-VN", { hour12: false }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg mb-3 text-xs flex-wrap">
       <StatBadge
@@ -30,8 +39,8 @@ export default function LiveConsoleHeader({ snapshot }) {
         label="singles"
         value={activeSingles ?? 0}
       />
-      <div className="ml-auto text-gray-500 font-mono">
-        {new Date().toLocaleTimeString("vi-VN", { hour12: false })}
+      <div className="ml-auto text-gray-500 font-mono" suppressHydrationWarning>
+        {now ?? "--:--:--"}
       </div>
     </div>
   );
