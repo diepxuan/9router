@@ -107,3 +107,49 @@ export async function deleteCombo(id) {
   const res = db.run(`DELETE FROM combos WHERE id = ?`, [id]);
   return (res?.changes ?? 0) > 0;
 }
+
+/**
+ * Remove given model ids from every combo's models[]. Atomic transaction.
+ *
+ * Match rule: exact string equality against each entry of combo.models. No
+ * prefix inference — caller is responsible for passing ids in the same form
+ * stored in the combo (e.g. "nvidia/deepseek-ai/deepseek-v4-pro" or "minimax").
+ *
+ * Used to keep combos in sync when a user disables a model via
+ * POST /api/models/disabled — so a disabled model does not stay referenced
+ * inside combos (would 400 on every retry as if EOL).
+ *
+ * @param {string[]} ids - model ids to remove (no-op if empty/invalid)
+ * @param {string} [providerAlias] - provider alias used purely for logging
+ *   context; matching is always exact. Caller may pass null/undefined.
+ * @returns {number} count of combos whose models[] was modified.
+ */
+export async function removeModelsFromAllCombos(ids, providerAlias) {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  const removeSet = new Set(ids.filter((x) => typeof x === "string" && x));
+  if (removeSet.size === 0) return 0;
+  const db = await getAdapter();
+  let updated = 0;
+  let removed = 0;
+  db.transaction(() => {
+    const combos = db.all(`SELECT id, name, models FROM combos`).map(rowToCombo);
+    for (const combo of combos) {
+      if (!Array.isArray(combo.models) || combo.models.length === 0) continue;
+      const next = combo.models.filter((m) => !removeSet.has(m));
+      if (next.length === combo.models.length) continue;
+      removed += combo.models.length - next.length;
+      db.run(
+        `UPDATE combos SET models = ?, updatedAt = ? WHERE id = ?`,
+        [stringifyJson(next), new Date().toISOString(), combo.id]
+      );
+      updated++;
+    }
+  });
+  if (updated > 0) {
+    console.log(
+      `[combosRepo] removed ${removed} model entries from ${updated} combo(s)` +
+      (providerAlias ? ` (triggered by disable on provider "${providerAlias}")` : "")
+    );
+  }
+  return updated;
+}
