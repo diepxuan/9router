@@ -12,6 +12,7 @@ import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/sha
 
 // Validate combo name: only a-z, A-Z, 0-9, -, _
 const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
+const DEFAULT_COMBO_NAME = "default";
 
 export default function CombosPage() {
   const [combos, setCombos] = useState([]);
@@ -40,9 +41,13 @@ export default function CombosPage() {
       const settingsData = settingsRes.ok ? await settingsRes.json() : {};
       
       // Only LLM combos here - webSearch/webFetch combos belong to media-providers/web
-      if (combosRes.ok) setCombos((combosData.combos || [])
-        .filter(c => !c.kind || c.kind === "llm")
-        .sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+      if (combosRes.ok) {
+        const llmCombos = (combosData.combos || []).filter(c => !c.kind || c.kind === "llm");
+        setCombos([
+          ...llmCombos.filter(c => c.name === DEFAULT_COMBO_NAME),
+          ...llmCombos.filter(c => c.name !== DEFAULT_COMBO_NAME).sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+        ]);
+      }
       if (providersRes.ok) {
         setActiveProviders(providersData.connections || []);
       }
@@ -189,7 +194,7 @@ export default function CombosPage() {
               copied={copied}
               onCopy={copy}
               onEdit={() => setEditingCombo(combo)}
-              onDelete={() => handleDelete(combo.id)}
+              onDelete={combo.name === DEFAULT_COMBO_NAME ? undefined : () => handleDelete(combo.id)}
               strategy={comboStrategies[combo.name] || {}}
               onSetStrategy={(patch) => handleSetComboStrategy(combo.name, patch)}
             />
@@ -239,6 +244,7 @@ const STRATEGY_OPTIONS = [
 ];
 
 function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdit, onDelete, strategy = {}, onSetStrategy }) {
+  const isDefault = combo.name === DEFAULT_COMBO_NAME;
   const [showJudgeSelect, setShowJudgeSelect] = useState(false);
   const current = strategy.fallbackStrategy || "fallback";
   const judge = strategy.judgeModel || "";
@@ -252,7 +258,10 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
             <span className="material-symbols-outlined text-primary text-[18px]">layers</span>
           </div>
           <div className="min-w-0 flex-1">
-            <code className="block truncate font-mono text-sm font-medium">{combo.name}</code>
+            <div className="flex min-w-0 items-center gap-2">
+              <code className="block truncate font-mono text-sm font-medium">{combo.name}</code>
+              {isDefault && <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Default</span>}
+            </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
               {combo.models.length === 0 ? (
                 <span className="text-xs text-text-muted italic">No models</span>
@@ -334,14 +343,16 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
               <span className="material-symbols-outlined text-[18px]">edit</span>
               <span className="text-[10px] leading-tight">Edit</span>
             </button>
-            <button
-              onClick={onDelete}
-              className="flex flex-col items-center rounded px-2 py-1 text-red-500 transition-colors hover:bg-red-500/10"
-              title="Delete"
-            >
-              <span className="material-symbols-outlined text-[18px]">delete</span>
-              <span className="text-[10px] leading-tight">Delete</span>
-            </button>
+            {!isDefault && (
+              <button
+                onClick={onDelete}
+                className="flex flex-col items-center rounded px-2 py-1 text-red-500 transition-colors hover:bg-red-500/10"
+                title="Delete"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                <span className="text-[10px] leading-tight">Delete</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -461,6 +472,7 @@ function ModelItem({ id, index, model, isFirst, isLast, onEdit, onMoveUp, onMove
 }
 
 function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindFilter = null }) {
+  const isDefault = combo?.name === DEFAULT_COMBO_NAME;
   // Initialize state with combo values - key prop on parent handles reset on remount
   const [name, setName] = useState(combo?.name || "");
   const [models, setModels] = useState(combo?.models || []);
@@ -573,9 +585,10 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
             <Input
               label="Combo Name"
               value={name}
-              onChange={handleNameChange}
+              onChange={isDefault ? undefined : handleNameChange}
               placeholder="my-combo"
               error={nameError}
+              disabled={isDefault}
             />
             <p className="text-[10px] text-text-muted mt-0.5">
               Only letters, numbers, -, _ and . allowed

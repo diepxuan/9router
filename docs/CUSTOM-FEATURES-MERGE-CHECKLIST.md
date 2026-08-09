@@ -212,3 +212,32 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - `vitest run tests/unit/combos-remove-models.test.js`: 4/4 PASS.
 - `vitest run tests/unit/diepxuan-feature-flags.test.js`: 7/7 PASS.
 - `node scripts/diepxuan/check-custom-features.mjs`: 634/634 PASS.
+
+
+### 2026-08-09 - Default LLM combo + unresolvable chat fallback
+
+**Mục đích**: Luôn có combo LLM `default` với models mặc định `["llmfree"]`, nằm đầu danh sách combo, không thể xóa/đổi tên ở API/UI, và các request LLM chat có model không resolve được sẽ chạy qua combo `default`.
+
+**File thay đổi**:
+- `src/diepxuan/lib/defaultCombo.js` (mới): hằng số `DEFAULT_COMBO_NAME`, `DEFAULT_COMBO_MODELS`, `ensureDefaultCombo()`, `getCombosWithDefaultFirst()`, `canResolveModel()`, `resolveDefaultComboFallback()`. Chỉ active khi fork enabled và không safe mode.
+- `src/app/api/combos/route.js`: GET đảm bảo `default` và trả nó đầu danh sách; POST `default` là ensure/upsert idempotent.
+- `src/app/api/combos/[id]/route.js`: GET/PUT/DELETE tự ensure khi không thấy; chặn delete và đổi tên `default`.
+- `src/app/api/v1/models/route.js`: gọi `ensureDefaultCombo()` trước khi đọc combos.
+- `src/sse/handlers/chat.js`: gọi `resolveDefaultComboFallback()` trước combo routing; chỉ LLM chat bị fallback, không đổi image/TTS/web.
+- `src/sse/handlers/search.js`, `src/sse/handlers/fetch.js`: gọi `ensureDefaultCombo()` (chỉ đảm bảo có default LLM, không fallback web vào nó).
+- `src/app/(dashboard)/dashboard/combos/page.js`: server order giữ `default` đầu, ẩn nút Delete, disable đổi tên trong edit modal, hiển thị badge Default.
+- `tests/unit/diepxuan-default-combo.test.mjs` (mới).
+- `docs/custom-features.manifest.json`: thêm feature `default-combo`.
+- `memory/2026-08-09.md`: nhật ký khôi phục session bị context overflow và trạng thái verify.
+
+**Quyết định thiết kế**:
+- Models default: `["llmfree"]` theo lựa chọn của Sếp ở session plan 2026-08-08.
+- Phạm vi fallback: chỉ LLM chat (`/v1/chat/completions`, `/v1/responses`, `/v1/messages`, `/v1/api/chat`, `/v1/responses/compact`); image/TTS/web giữ nguyên.
+- Trigger: mọi model không resolve được (combo không tồn tại, alias lạ, provider prefix lạ); provider prefix hợp lệ vẫn giữ hành vi lỗi credential hiện tại.
+- `default` không thể xóa/đổi tên nhưng vẫn sửa được models/strategy.
+
+**Smoke test**:
+- `GET /api/combos` có `default` đầu danh sách, models `["llmfree"]`.
+- `DELETE /api/combos/{defaultId}` trả 400 `Default combo cannot be deleted`.
+- Gọi `/v1/chat/completions` với model `totally-missing-combo` -> log `Invalid model format, using default combo`, chạy combo `default`.
+- Dashboard `/dashboard/combos`: `default` đầu list, không có nút Delete, edit modal disable name.

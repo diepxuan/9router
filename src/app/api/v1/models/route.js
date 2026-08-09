@@ -6,6 +6,7 @@ import {
   isOpenAICompatibleProvider,
 } from "@/shared/constants/providers";
 import { getProviderConnections, getCombos, getCustomModels, getModelAliases } from "@/lib/localDb";
+import { ensureDefaultCombo } from "@/diepxuan/lib/defaultCombo.js";
 import { getDisabledModels } from "@/lib/disabledModelsDb";
 import { resolveKiroModels } from "open-sse/services/kiroModels.js";
 import { resolveKimchiModels } from "open-sse/services/kimchiModels.js";
@@ -246,6 +247,7 @@ export async function buildModelsList(kindFilter, options = {}) {
 
   let combos = [];
   try {
+    await ensureDefaultCombo();
     combos = await getCombos();
   } catch (e) {
     console.log("Could not fetch combos");

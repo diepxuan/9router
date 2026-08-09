@@ -14,6 +14,7 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { handleComboChat } from "open-sse/services/combo.js";
 import { handleDiepXuanWebComboFallback } from "@/diepxuan/sse/webComboFallback.js";
+import { ensureDefaultCombo } from "@/diepxuan/lib/defaultCombo.js";
 
 /**
  * Handle web search request for the SSE/Next.js server.
@@ -64,6 +65,7 @@ export async function handleSearch(request) {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing required field: query");
   }
 
+  await ensureDefaultCombo();
   const combos = await getCombos();
   const providerId = providerInput && typeof providerInput === "string" ? resolveProviderId(providerInput) : null;
   const resolvedProvider = providerId ? AI_PROVIDERS[providerId] : null;
