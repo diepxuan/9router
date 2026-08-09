@@ -241,3 +241,9 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - `DELETE /api/combos/{defaultId}` trả 400 `Default combo cannot be deleted`.
 - Gọi `/v1/chat/completions` với model `totally-missing-combo` -> log `Invalid model format, using default combo`, chạy combo `default`.
 - Dashboard `/dashboard/combos`: `default` đầu list, không có nút Delete, edit modal disable name.
+
+**Smoke test đã chạy (2026-08-09)**:
+- `curl http://127.0.0.1:3000/v1/chat/completions` với `{"model":"tmp","messages":[{"role":"user","content":"Hi"}],"max_tokens":20}` -> HTTP 200, trả `"model":"minimaxai/minimax-m3"`.
+- Console log: `Invalid model format, using default combo {"model":"tmp"}` rồi chạy `default -> llmfree -> nvidia -> nvidia/minimaxai/minimax-m3`.
+- `GET /api/combos`: `default` đứng đầu, models `["llmfree"]`.
+- `npm run build`: PASS.
