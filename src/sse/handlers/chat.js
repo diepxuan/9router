@@ -10,6 +10,7 @@ import {
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings } from "@/lib/localDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
+import { resolveDefaultComboFallback } from "@/diepxuan/lib/defaultCombo.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { DEFAULT_HEADROOM_URL } from "@/lib/headroom/detect";
 import { getTransform as getPxpipeTransform } from "@/lib/pxpipe/loader.js";
@@ -86,16 +87,23 @@ export async function handleChat(request, clientRawRequest = null) {
   const bypassResponse = handleBypassRequest(body, modelStr, userAgent, !!settings.ccFilterNaming);
   if (bypassResponse) return bypassResponse.response || bypassResponse;
 
+  // DiepXuan: an unresolvable chat model falls back to the `default` combo.
+  const resolvedModel = await resolveDefaultComboFallback(modelStr);
+  if (resolvedModel.fallback && resolvedModel.modelStr !== modelStr) {
+    log.warn("CHAT", `Invalid model format, using default combo`, { model: modelStr });
+  }
+  const effectiveModelStr = resolvedModel.modelStr;
+
   // Check if model is a combo (has multiple models with fallback)
-  const comboModels = await getComboModels(modelStr);
+  const comboModels = await getComboModels(effectiveModelStr);
   if (comboModels) {
     // Check for combo-specific strategy first, fallback to global
     const comboStrategies = settings.comboStrategies || {};
-    const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
+    const comboSpecificStrategy = comboStrategies[effectiveModelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
 
     if (comboStrategy === "fusion") {
-      log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: fusion)`);
+      log.info("CHAT", `Combo "${effectiveModelStr}" with ${comboModels.length} models (strategy: fusion)`);
       return handleFusionChat({
         body,
         models: comboModels,
@@ -108,27 +116,27 @@ export async function handleChat(request, clientRawRequest = null) {
           return handleSingleModelChat(b, m, cleanRawReq, request, apiKey);
         },
         log,
-        comboName: modelStr,
-        judgeModel: comboStrategies[modelStr]?.judgeModel,
-        tuning: comboStrategies[modelStr]?.fusionTuning,
+        comboName: effectiveModelStr,
+        judgeModel: comboStrategies[effectiveModelStr]?.judgeModel,
+        tuning: comboStrategies[effectiveModelStr]?.fusionTuning,
       });
     }
 
     const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-    log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+    log.info("CHAT", `Combo "${effectiveModelStr}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
     return handleComboChat({
       body,
       models: comboModels,
       handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
       log,
-      comboName: modelStr,
+      comboName: effectiveModelStr,
       comboStrategy,
       comboStickyLimit
     });
   }
 
   // Single model request
-  const result = await handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  const result = await handleSingleModelChat(body, effectiveModelStr, clientRawRequest, request, apiKey);
   return result.response || result;
 }
 

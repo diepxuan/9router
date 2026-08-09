@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
 import { getCombos, createCombo, getComboByName } from "@/lib/localDb";
+import { DEFAULT_COMBO_NAME, ensureDefaultCombo, getCombosWithDefaultFirst } from "@/diepxuan/lib/defaultCombo.js";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
   }
 export async function GET() {
   try {
-    const combos = await getCombos();
+    const combos = await getCombosWithDefaultFirst();
     return NextResponse.json({ combos: combos.map(c => ({ ...c, modelContexts: enrichModels(c.models) })) });
   } catch (error) {
     console.log("Error fetching combos:", error);
@@ -40,6 +41,13 @@ export async function POST(request) {
     // Validate name format
     if (!VALID_NAME_REGEX.test(name)) {
       return NextResponse.json({ error: "Name can only contain letters, numbers, -, _ and ." }, { status: 400 });
+    }
+
+    // The default combo is reserved: create/ensure it from source, then return it.
+    if (name === DEFAULT_COMBO_NAME) {
+      const existing = await ensureDefaultCombo();
+      if (existing) return NextResponse.json(existing, { status: 200 });
+      return NextResponse.json({ error: "Default combo is unavailable" }, { status: 500 });
     }
 
     // Check if name already exists

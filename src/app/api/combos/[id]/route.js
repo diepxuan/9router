@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getContextLengthBatchCached, getStaticContextLength } from "open-sse/diepxuan/contextLength/index.js";
 import { getComboById, updateCombo, deleteCombo, getComboByName, renameComboReferences } from "@/lib/localDb";
 import { resetComboRotation } from "open-sse/services/combo.js";
+import { DEFAULT_COMBO_NAME, ensureDefaultCombo } from "@/diepxuan/lib/defaultCombo.js";
 
 // Validate combo name: only a-z, A-Z, 0-9, -, _
 const VALID_NAME_REGEX = /^[a-zA-Z0-9_.\-]+$/;
@@ -13,6 +14,7 @@ export async function GET(request, { params }) {
     const combo = await getComboById(id);
     
     if (!combo) {
+      await ensureDefaultCombo();
       return NextResponse.json({ error: "Combo not found" }, { status: 404 });
     }
     
@@ -50,6 +52,15 @@ export async function PUT(request, { params }) {
     
     // Capture previous name to invalidate rotation state on rename
     const prev = await getComboById(id);
+    if (!prev) {
+      await ensureDefaultCombo();
+      return NextResponse.json({ error: "Combo not found" }, { status: 404 });
+    }
+
+    if (prev.name === DEFAULT_COMBO_NAME && body.name && body.name !== DEFAULT_COMBO_NAME) {
+      return NextResponse.json({ error: "Default combo name cannot be changed" }, { status: 400 });
+    }
+
     const combo = await updateCombo(id, body);
     
     if (!combo) {
@@ -76,6 +87,15 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params;
     const prev = await getComboById(id);
+    if (!prev) {
+      await ensureDefaultCombo();
+      return NextResponse.json({ error: "Combo not found" }, { status: 404 });
+    }
+
+    if (prev.name === DEFAULT_COMBO_NAME) {
+      return NextResponse.json({ error: "Default combo cannot be deleted" }, { status: 400 });
+    }
+
     const success = await deleteCombo(id);
     
     if (!success) {

@@ -15,6 +15,7 @@ import { updateProviderCredentials, checkAndRefreshToken } from "../services/tok
 import { handleComboChat, getComboModelsFromData } from "open-sse/services/combo.js";
 import { assertPublicUrl } from "@/shared/utils/ssrfGuard.js";
 import { handleDiepXuanWebComboFallback } from "@/diepxuan/sse/webComboFallback.js";
+import { ensureDefaultCombo } from "@/diepxuan/lib/defaultCombo.js";
 
 /**
  * Handle web fetch (URL extraction) request for the SSE/Next.js server.
@@ -84,6 +85,7 @@ export async function handleFetch(request) {
   }
 
   // Combo expansion: providerInput may be a combo name → run fallback/round-robin across providers
+  await ensureDefaultCombo();
   const combos = await getCombos();
   const providerId = providerInput && typeof providerInput === "string" ? resolveProviderId(providerInput) : null;
   const resolvedProvider = providerId ? AI_PROVIDERS[providerId] : null;

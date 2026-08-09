@@ -906,7 +906,67 @@
         "src/diepxuan/sse/webComboFallback.js",
         "src/app/(dashboard)/dashboard/providers/[id]/ModelRow.js"
       ]
+    },
+    {
+      "id": "default-combo",
+      "description": "Default LLM combo: auto-ensure `default` with [\"llmfree\"], pinned first in combo lists, delete/rename protected, unresolvable chat models fall back to it.",
+      "requiredFiles": [
+        "src/diepxuan/lib/defaultCombo.js",
+        "src/app/api/combos/route.js",
+        "src/app/api/combos/[id]/route.js",
+        "src/app/api/v1/models/route.js",
+        "src/sse/handlers/chat.js",
+        "src/app/(dashboard)/dashboard/combos/page.js",
+        "tests/unit/diepxuan-default-combo.test.mjs"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "src/diepxuan/lib/defaultCombo.js",
+          "pattern": "DEFAULT_COMBO_NAME"
+        },
+        {
+          "file": "src/diepxuan/lib/defaultCombo.js",
+          "pattern": "DEFAULT_COMBO_MODELS"
+        },
+        {
+          "file": "src/diepxuan/lib/defaultCombo.js",
+          "pattern": "ensureDefaultCombo"
+        },
+        {
+          "file": "src/diepxuan/lib/defaultCombo.js",
+          "pattern": "resolveDefaultComboFallback"
+        },
+        {
+          "file": "src/app/api/combos/route.js",
+          "pattern": "getCombosWithDefaultFirst"
+        },
+        {
+          "file": "src/app/api/combos/[id]/route.js",
+          "pattern": "Default combo cannot be deleted"
+        },
+        {
+          "file": "src/sse/handlers/chat.js",
+          "pattern": "resolveDefaultComboFallback"
+        },
+        {
+          "file": "src/app/(dashboard)/dashboard/combos/page.js",
+          "pattern": "DEFAULT_COMBO_NAME"
+        },
+        {
+          "file": "tests/unit/diepxuan-default-combo.test.mjs",
+          "pattern": "resolveDefaultComboFallback"
+        }
+      ],
+      "syntaxCheck": [
+        "src/diepxuan/lib/defaultCombo.js",
+        "src/app/api/combos/route.js",
+        "src/app/api/combos/[id]/route.js",
+        "src/app/api/v1/models/route.js",
+        "src/sse/handlers/chat.js",
+        "src/app/(dashboard)/dashboard/combos/page.js",
+        "tests/unit/diepxuan-default-combo.test.mjs"
+      ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18. PR #68 (2026-08-06) dropped rate-limit-engine (ADR-007) -> 17 features."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18. PR #68 (2026-08-06) dropped rate-limit-engine (ADR-007) -> 17 features. 2026-08-09 added default-combo -> 18 features."
 }
