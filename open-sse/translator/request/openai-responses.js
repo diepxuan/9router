@@ -8,6 +8,7 @@ import { register } from "../index.js";
 import { FORMATS } from "../formats.js";
 import { normalizeResponsesInput } from "../formats/responsesApi.js";
 import { ROLE, OPENAI_BLOCK, RESPONSES_ITEM } from "../schema/index.js";
+import { isCustomTool, unwrapCustomToolArguments, wrapCustomToolArguments } from "../../diepxuan/codex/customToolBridge.js";
 
 // Responses API enforces max 64 chars on call_id (#393)
 const MAX_CALL_ID_LEN = 64;
@@ -96,7 +97,7 @@ export function openaiResponsesToOpenAIRequest(model, body, stream, credentials)
       }
       result.messages.push(msg);
     }
-    else if (itemType === RESPONSES_ITEM.FUNCTION_CALL) {
+    else if (itemType === RESPONSES_ITEM.FUNCTION_CALL || itemType === RESPONSES_ITEM.CUSTOM_TOOL_CALL) {
       // Start or append to assistant message with tool_calls
       if (!currentAssistantMsg) {
         currentAssistantMsg = {
@@ -108,16 +109,18 @@ export function openaiResponsesToOpenAIRequest(model, body, stream, credentials)
       }
       // Skip items with empty/missing name — Codex/OpenAI reject nameless tool calls (#444)
       if (!item.name || typeof item.name !== "string" || item.name.trim() === "") continue;
+      const isCustom = isCustomTool(item);
+      const toolInput = isCustom ? wrapCustomToolArguments(item.input ?? item.arguments) : item.arguments;
       currentAssistantMsg.tool_calls.push({
         id: item.call_id,
         type: OPENAI_BLOCK.FUNCTION,
         function: {
           name: item.name,
-          arguments: item.arguments
+          arguments: toolInput
         }
       });
     }
-    else if (itemType === RESPONSES_ITEM.FUNCTION_CALL_OUTPUT) {
+    else if (itemType === RESPONSES_ITEM.FUNCTION_CALL_OUTPUT || itemType === RESPONSES_ITEM.CUSTOM_TOOL_CALL_OUTPUT) {
       // Flush assistant message first if exists
       if (currentAssistantMsg) {
         result.messages.push(currentAssistantMsg);
@@ -175,6 +178,26 @@ export function openaiResponsesToOpenAIRequest(model, body, stream, credentials)
         // Only convert when a non-empty name is present; skip hosted tools without one.
         const name = tool.name;
         if (!name || typeof name !== "string" || name.trim() === "") return null;
+        if (isCustomTool(tool)) {
+          return {
+            type: OPENAI_BLOCK.FUNCTION,
+            function: {
+              name,
+              description: String(tool.description || ""),
+              parameters: {
+                type: "object",
+                properties: {
+                  input: {
+                    type: "string",
+                    description: "Raw freeform input for this custom tool"
+                  }
+                },
+                required: ["input"],
+                additionalProperties: false
+              }
+            }
+          };
+        }
         return {
           type: OPENAI_BLOCK.FUNCTION,
           function: {
@@ -329,11 +352,15 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
     // Convert tool calls
     if (msg.role === ROLE.ASSISTANT && msg.tool_calls) {
       for (const tc of msg.tool_calls) {
+        const fn = tc.function || {};
+        const custom = isCustomTool({ name: fn.name });
         result.input.push({
-          type: RESPONSES_ITEM.FUNCTION_CALL,
+          type: custom ? RESPONSES_ITEM.CUSTOM_TOOL_CALL : RESPONSES_ITEM.FUNCTION_CALL,
           call_id: clampCallId(tc.id),
-          name: tc.function?.name || "_unknown",
-          arguments: tc.function?.arguments || "{}"
+          name: fn.name || "_unknown",
+          ...(custom
+            ? { input: unwrapCustomToolArguments(fn.arguments) }
+            : { arguments: fn.arguments || "{}" })
         });
       }
     }
@@ -346,7 +373,7 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
           ? msg.content.map(c => c.text || JSON.stringify(c)).join("")
           : JSON.stringify(msg.content);
       result.input.push({
-        type: RESPONSES_ITEM.FUNCTION_CALL_OUTPUT,
+        type: msg.tool_call_id && isCustomTool({ name: msg.name }) ? RESPONSES_ITEM.CUSTOM_TOOL_CALL_OUTPUT : RESPONSES_ITEM.FUNCTION_CALL_OUTPUT,
         call_id: clampCallId(msg.tool_call_id),
         output
       });
