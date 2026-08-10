@@ -49,6 +49,20 @@ Các provider custom trong fork layer, base registry không sửa.
 | Source priority api > static > error | `contextLength/cache.js` |
 | Đọc ưu tiên static > error | `contextLength/index.js` (`getContextLengthSync`, batch) |
 
+
+### 3b. Codex custom tool bridge (apply_patch qua provider chat)
+
+| Feature | File chính |
+|---|---|
+| Detect Codex client | `open-sse/diepxuan/codex/customToolBridge.js` (`isCodexClient`) |
+| Custom tool wrapper | `open-sse/diepxuan/codex/customToolBridge.js` (`wrapCustomToolArguments` / `unwrapCustomToolArguments`) |
+| Request bridge | `open-sse/translator/request/openai-responses.js`, `open-sse/translator/index.js` |
+| Response bridge | `open-sse/translator/response/openai-responses.js`, `open-sse/handlers/chatCore/*` |
+| Stream metadata | `open-sse/utils/stream.js`, `open-sse/handlers/chatCore/streamingHandler.js` |
+| Non-stream metadata | `open-sse/handlers/chatCore/nonStreamingHandler.js`, `sseToJsonHandler.js` |
+
+Smoke test: chạy Codex CLI qua một provider Chat, yêu cầu sửa file; console phải nhận `apply_patch` và không còn `aborted`.
+
 ### 4. Fork transformers & executors
 
 | Feature | File chính |

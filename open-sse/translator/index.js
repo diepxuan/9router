@@ -3,6 +3,7 @@ import { ensureToolCallIds, fixMissingToolResponses } from "./concerns/toolCall.
 import { sanitizeToolCallIdsForNvidia } from "../diepxuan/nvidia/cleanToolIds.js";
 import { stripBuiltinTools } from "../diepxuan/transformers/stripBuiltinTools.js";
 import { stripCodexModelMarkersFromBody } from "../diepxuan/transformers/stripCodexModelMarkers.js";
+import { collectCustomToolNames } from "../diepxuan/codex/customToolBridge.js";
 import { prepareClaudeRequest } from "./formats/claude.js";
 import { cloakClaudeTools } from "../utils/claudeCloaking.js";
 import { filterToOpenAIFormat } from "./formats/openai.js";
@@ -55,6 +56,10 @@ function stripContentTypes(body, stripList = []) {
 export function translateRequest(sourceFormat, targetFormat, model, body, stream = true, credentials = null, provider = null, reqLogger = null, stripList = [], connectionId = null, clientTool = null) {
   ensureInitialized();
   let result = body;
+  if (clientTool === "codex") {
+    const customToolNames = collectCustomToolNames(result);
+    if (customToolNames.length > 0) result._customToolNames = customToolNames;
+  }
 
   // Strip explicit content types (opt-in via strip[] in PROVIDER_MODELS entry)
   stripContentTypes(result, stripList);
@@ -269,6 +274,7 @@ export function initState(sourceFormat) {
       funcCallIds: {},
       funcArgsDone: {},
       funcItemDone: {},
+      funcItemAdded: {},
       completedSent: false
     };
   }

@@ -966,7 +966,45 @@
         "src/app/(dashboard)/dashboard/combos/page.js",
         "tests/unit/diepxuan-default-combo.test.mjs"
       ]
+    },
+    {
+      "id": "codex-custom-tools-bridge",
+      "description": "Codex custom/freeform tools (apply_patch) through non-Codex providers: wrap as Chat input, restore custom_tool_call.",
+      "requiredFiles": [
+        "open-sse/diepxuan/codex/customToolBridge.js",
+        "open-sse/translator/index.js",
+        "open-sse/translator/request/openai-responses.js",
+        "open-sse/translator/response/openai-responses.js",
+        "open-sse/handlers/chatCore.js",
+        "open-sse/handlers/chatCore/streamingHandler.js",
+        "open-sse/handlers/chatCore/nonStreamingHandler.js",
+        "open-sse/handlers/chatCore/sseToJsonHandler.js",
+        "open-sse/utils/stream.js",
+        "tests/unit/codex-custom-tools-bridge.test.js"
+      ],
+      "requiredPatterns": [
+        {
+          "file": "open-sse/diepxuan/codex/customToolBridge.js",
+          "pattern": "collectCustomToolNames"
+        },
+        {
+          "file": "open-sse/diepxuan/codex/customToolBridge.js",
+          "pattern": "unwrapCustomToolArguments"
+        },
+        {
+          "file": "open-sse/diepxuan/codex/customToolBridge.js",
+          "pattern": "isCodexClient"
+        },
+        {
+          "file": "open-sse/translator/response/openai-responses.js",
+          "pattern": "custom_tool_call"
+        },
+        {
+          "file": "open-sse/translator/request/openai-responses.js",
+          "pattern": "wrapCustomToolArguments"
+        }
+      ]
     }
   ],
-  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18. PR #68 (2026-08-06) dropped rate-limit-engine (ADR-007) -> 17 features. 2026-08-09 added default-combo -> 18 features."
+  "note": "Schema 1. As of 2026-07-22, 14 features; 2026-07-24 added 3 -> 17; 2026-07-26 added combo-response-model-override -> 18. PR #68 (2026-08-06) dropped rate-limit-engine (ADR-007) -> 17 features. 2026-08-09 added default-combo -> 18 features. 2026-08-10 added codex-custom-tools-bridge -> 19 features."
 }
