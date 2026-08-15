@@ -72,6 +72,7 @@ Smoke test: chạy Codex CLI qua một provider Chat, yêu cầu sửa file; con
 | OpenAI Chat Completions param quirks | Strip `text` and incompatible `reasoning_effort` in `open-sse/diepxuan/translator/paramSupportHooks.js` |
 | TokenRouter reasoning_effort clamp | `open-sse/diepxuan/translator/paramSupportHooks.js` (low/high/max) |
 | TokenRouter flatten assistant content | `open-sse/diepxuan/translator/paramSupportHooks.js` (array → string) |
+| TokenRouter coalesce system messages | `open-sse/diepxuan/translator/paramSupportHooks.js` |
 | Codex builtin tool pruner (config-driven) | `transformers/stripBuiltinTools.js`, `registry/minimax.js`, `minimax-cn.js` |
 | Groq incompatible strip | `transformers/stripGroqIncompatible.js`, `executors/groq.js` |
 | MiMo free 441 cooldown | `executors/mimo-free.js`, `executors/index.js` |
@@ -261,3 +262,21 @@ Chạy: `node tests/unit/<file>` hoặc `npm test` (nếu có script).
 - Console log: `Invalid model format, using default combo {"model":"tmp"}` rồi chạy `default -> llmfree -> nvidia -> nvidia/minimaxai/minimax-m3`.
 - `GET /api/combos`: `default` đứng đầu, models `["llmfree"]`.
 - `npm run build`: PASS.
+
+### 2026-08-15 - TokenRouter coalesce system messages
+
+**Mục đích**: Fix lỗi `trk/qwen3.8-max-free` bị TokenRouter trả `400 System message must be at the beginning` khi Codex/Responses request sau khi translate có hai system message liên tiếp trong `messages[]`.
+
+**File thay đổi**:
+- `open-sse/diepxuan/translator/paramSupportHooks.js`: thêm rule `coalesceSystemMessages` cho `tokenrouter`. Khi `messages[]` có system/developer thứ hai trở lên, gộp text vào system đầu tiên và xóa các system message còn lại. Hỗ trợ content dạng string, `text`/`input_text`/`output_text` parts và bỏ qua non-text parts.
+- `tests/unit/paramSupportHooks.test.mjs`: thêm 3 test cho việc gộp system message, Responses-style parts và giữ nguyên single system message.
+
+**Quyết định thiết kế**:
+- Không sửa base translator `openai-responses.js`; fix nằm trong fork layer, chỉ active khi provider là `tokenrouter` và `DIEPXUAN_ENABLED=true`.
+- Không mất nội dung: nối text các system message lại bằng `\n\n`, giữ message system đầu tiên đúng vị trí.
+- Không đổi hành vi provider khác; rule chỉ áp dụng cho TokenRouter.
+
+**Verify**:
+- `node --test tests/unit/paramSupportHooks.test.mjs`: 12/12 PASS.
+- `node --check open-sse/diepxuan/translator/paramSupportHooks.js tests/unit/paramSupportHooks.test.mjs`: OK.
+- `node scripts/diepxuan/check-custom-features.mjs`: 693/693 PASS.
