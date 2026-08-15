@@ -28,7 +28,48 @@ const FORK_STRIP_RULES = [
   // TokenRouter Kimi K3 Free only accepts low/high/max and string content.
   { provider: "tokenrouter", clampReasoningEffort: ["low", "high", "max"], defaultReasoningEffort: "high" },
   { provider: "tokenrouter", flattenAssistantContent: true },
+  // TokenRouter rejects a second system message when a Codex Responses request
+  // already moved `instructions` into messages[0] as system. Merge the remaining
+  // system input item into the first message instead of sending two systems.
+  { provider: "tokenrouter", coalesceSystemMessages: true },
 ];
+
+function extractMessageText(message) {
+  if (!message) return "";
+  if (typeof message.content === "string") return message.content;
+  if (Array.isArray(message.content)) {
+    return message.content
+      .map((part) => (part && (part.text || part.input_text || part.output_text)) || "")
+      .join("");
+  }
+  return "";
+}
+
+function mergeSystemMessages(messages) {
+  const firstSystemIndex = messages.findIndex((msg) => msg?.role === "system" || msg?.role === "developer");
+  if (firstSystemIndex < 0) return;
+
+  const merged = { ...messages[firstSystemIndex] };
+  let mergedText = extractMessageText(merged);
+  let changed = false;
+
+  for (let i = firstSystemIndex + 1; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg?.role !== "system" && msg?.role !== "developer") continue;
+    const text = extractMessageText(msg);
+    if (text) {
+      mergedText = mergedText ? `${mergedText}\n\n${text}` : text;
+    }
+    messages.splice(i, 1);
+    i--;
+    changed = true;
+  }
+
+  if (changed) {
+    merged.content = mergedText;
+    messages[firstSystemIndex] = merged;
+  }
+}
 
 /**
  * Ap dung fork param rules len body request.
@@ -90,6 +131,13 @@ export function applyForkParamRules(provider, body, model = body?.model) {
           .join("");
         msg.content = text;
       }
+    }
+
+    // Some OpenAI-compatible gateways (TokenRouter) reject a second system
+    // message. Codex Responses conversion can produce messages[0] from
+    // `instructions` and still copy a system item from `input` in second place.
+    if (rule.coalesceSystemMessages && Array.isArray(body.messages)) {
+      mergeSystemMessages(body.messages);
     }
   }
 }

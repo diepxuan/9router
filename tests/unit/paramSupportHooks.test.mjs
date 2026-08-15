@@ -48,6 +48,54 @@ test("tokenrouter leaves string assistant content unchanged", () => {
   assert.equal(body.messages[0].content, "plain");
 });
 
+test("tokenrouter merges a second system message into the first", () => {
+  const body = {
+    messages: [
+      { role: "system", content: "instructions" },
+      { role: "system", content: [{ type: "text", text: "skills" }] },
+      { role: "user", content: "hello" },
+    ],
+  };
+  applyForkParamRules("tokenrouter", body);
+  assert.equal(body.messages.length, 2);
+  assert.equal(body.messages[0].role, "system");
+  assert.equal(body.messages[0].content, "instructions\n\nskills");
+  assert.equal(body.messages[1].role, "user");
+});
+
+test("tokenrouter merges Responses-style system content parts", () => {
+  const body = {
+    messages: [
+      { role: "system", content: "instructions" },
+      {
+        role: "system",
+        content: [
+          { type: "input_text", text: "one" },
+          { type: "output_text", text: "two" },
+          { type: "image_url", image_url: { url: "x" } },
+        ],
+      },
+      { role: "assistant", content: "ok" },
+    ],
+  };
+  applyForkParamRules("tokenrouter", body);
+  assert.equal(body.messages.length, 2);
+  assert.equal(body.messages[0].content, "instructions\n\nonetwo");
+  assert.equal(body.messages[1].role, "assistant");
+});
+
+test("tokenrouter leaves a single system message unchanged", () => {
+  const body = {
+    messages: [
+      { role: "system", content: "instructions" },
+      { role: "user", content: "hello" },
+    ],
+  };
+  applyForkParamRules("tokenrouter", body);
+  assert.equal(body.messages.length, 2);
+  assert.equal(body.messages[0].content, "instructions");
+});
+
 test("openai strips Responses-only text param for Chat Completions", () => {
   const body = { text: { verbosity: "low" }, reasoning_effort: "medium" };
   applyForkParamRules("openai", body, "gpt-5.5");
